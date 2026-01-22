@@ -34,6 +34,9 @@ export default function App() {
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [sameAddress, setSameAddress] = useState(false);
 
+  // Get API URL from environment variable
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const paymentOptions = [
     { value: "", label: "Select Payment Mode" },
     { value: "Cash", label: "Cash" },
@@ -127,7 +130,7 @@ export default function App() {
 
     try {
       await Promise.all([
-        axios.post("http://localhost:5000/api/submit", formData, {
+        axios.post(`${API_URL}/api/submit`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         }),
         delay(5000),
