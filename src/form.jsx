@@ -21,6 +21,7 @@ export default function App() {
     classYear: "",
     board: "",
     course: "",
+    modeOfClass: "",
     feesPaid: "",
     paymentMode: "",
     installment: "",
@@ -65,18 +66,18 @@ export default function App() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
-    
+
     if (name === "permanentAddress" && sameAddress) {
-      setForm(prev => ({ ...prev, currentAddress: value }));
+      setForm((prev) => ({ ...prev, currentAddress: value }));
     }
   };
 
   const handleSameAddressChange = (e) => {
     const checked = e.target.checked;
     setSameAddress(checked);
-    
+
     if (checked) {
-      setForm(prev => ({ ...prev, currentAddress: prev.permanentAddress }));
+      setForm((prev) => ({ ...prev, currentAddress: prev.permanentAddress }));
     }
   };
 
@@ -203,7 +204,7 @@ export default function App() {
                   onInput={(e) =>
                     (e.target.value = e.target.value.replace(
                       /[^A-Za-z\s]/g,
-                      ""
+                      "",
                     ))
                   }
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
@@ -296,7 +297,7 @@ export default function App() {
                   onChange={handleChange}
                 />
               </div>
-              
+
               {/* Permanent Address */}
               <div className="md:col-span-2">
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -410,7 +411,7 @@ export default function App() {
                   onInput={(e) =>
                     (e.target.value = e.target.value.replace(
                       /[^A-Za-z\s]/g,
-                      ""
+                      "",
                     ))
                   }
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
@@ -431,7 +432,7 @@ export default function App() {
                   onInput={(e) =>
                     (e.target.value = e.target.value.replace(
                       /[^A-Za-z\s]/g,
-                      ""
+                      "",
                     ))
                   }
                   placeholder="Father/Mother/Guardian"
@@ -474,7 +475,7 @@ export default function App() {
                   onInput={(e) =>
                     (e.target.value = e.target.value.replace(
                       /[^A-Za-z\s]/g,
-                      ""
+                      "",
                     ))
                   }
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
@@ -508,7 +509,7 @@ export default function App() {
                   onInput={(e) =>
                     (e.target.value = e.target.value.replace(
                       /[^A-Za-z\s]/g,
-                      ""
+                      "",
                     ))
                   }
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
@@ -547,7 +548,7 @@ export default function App() {
                   onInput={(e) =>
                     (e.target.value = e.target.value.replace(
                       /[^A-Za-z\s]/g,
-                      ""
+                      "",
                     ))
                   }
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
@@ -558,7 +559,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* 4. Course Details */}
           <section className="mb-12">
             <h3
               className="text-2xl font-bold text-gray-900 mb-3 pb-3"
@@ -566,22 +566,51 @@ export default function App() {
             >
               4. Course Details
             </h3>
-            <div>
-              <label className="block text-lg font-bold text-gray-700 mb-2">
-                Course Name<span className="text-red-500">*</span>
-              </label>
-              <select
-                name="course"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 bg-white"
-                onChange={handleChange}
-                required
-              >
-                {courseOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-lg font-bold text-gray-700 mb-2">
+                  Course Name<span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="course"
+                  className="w-[90%] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 bg-white"
+                  onChange={handleChange}
+                  required
+                >
+                  {courseOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-lg font-bold text-gray-700 mb-2">
+                  Mode of Class
+                </label>
+                <div className="flex space-x-6 mt-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="modeOfClass"
+                      value="Physical Lecture"
+                      className="mr-2 text-blue-500 focus:ring-blue-300"
+                      onChange={handleChange}
+                    />
+                    Physical Lecture
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="modeOfClass"
+                      value="Virtual Lecture"
+                      className="mr-2 text-blue-500 focus:ring-blue-300"
+                      onChange={handleChange}
+                    />
+                    Virtual Lecture
+                  </label>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -623,7 +652,7 @@ export default function App() {
                   </label>
                 </div>
               </div>
-              
+
               {form.feesPaid === "Yes" && (
                 <>
                   <div>
@@ -672,7 +701,6 @@ export default function App() {
                       ))}
                     </select>
                   </div>
-                  
                 </>
               )}
             </div>
