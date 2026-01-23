@@ -857,9 +857,9 @@ export default function App() {
   const [recaptchaLoaded, setRecaptchaLoaded] = useState(false);
 
   // IMPORTANT: Replace with your actual reCAPTCHA Site Key
-  const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"; // Replace with your key
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY; // Replace with your key
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
+  
   // Load reCAPTCHA script
   useEffect(() => {
     const script = document.createElement("script");
@@ -1503,7 +1503,7 @@ export default function App() {
           {/* reCAPTCHA Section */}
           <section className="mb-8">
             <div className="flex justify-center">
-              <div className="g-recaptcha" data-sitekey={RECAPTCHA_SITE_KEY}></div>
+              <div className="g-recaptcha" data-sitekey={siteKey}></div>
             </div>
             {!recaptchaLoaded && (
               <p className="text-center text-gray-500 text-sm mt-2">
