@@ -933,7 +933,7 @@ export default function App() {
   const [fileErrors, setFileErrors] = useState({});
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [sameAddress, setSameAddress] = useState(false);
-  // const [recaptchaLoaded, setRecaptchaLoaded] = useState(false);
+  const [recaptchaLoaded, setRecaptchaLoaded] = useState(false);
 
   // IMPORTANT: Replace with your actual reCAPTCHA Site Key
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY; // Replace with your key
@@ -976,7 +976,7 @@ export default function App() {
     { value: "ATPL Theory Training", label: "ATPL Theory Training" },
     { value: "Flight Training", label: "Flight Training" },
     { value: "Type Rating", label: "Type Rating" },
-    { value: "Licence Conversion", label: "Licence Conversion" },
+    // { value: "Licence Conversion", label: "Licence Conversion" },
     { value: "Mentorship Programme", label: "Mentorship Programme" },
   ];
 
