@@ -1725,162 +1725,6 @@ export default function ConversionRecencyForm() {
           </section>
 
           {/* 8. Additional Documents */}
-          {/* <section className="mb-12">
-              <h3 className="text-2xl font-bold mb-6 pb-3 inline-block border-b-2" style={{ color: "#003366", borderColor: "#003366" }}>
-                8. Additional Documents
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Upload RTR<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="file"
-                    name="rtr"
-                    accept="application/pdf"
-                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
-                    required
-                    onChange={handleFile}
-                  />
-                  <p className="text-sm text-gray-600 mt-1">Only PDF files allowed, less than 2MB</p>
-                </div>
-                <div>
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    RTR Validity<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    name="rtrValidity"
-                    value={form.rtrValidity}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
-                    required
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Upload FRTOL<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="file"
-                    name="frtol"
-                    accept="application/pdf"
-                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
-                    required
-                    onChange={handleFile}
-                  />
-                  <p className="text-sm text-gray-600 mt-1">Only PDF files allowed, less than 2MB</p>
-                </div>
-                </div>
-                <div>
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Date of Police Verification
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    name="policeVerificationDate"
-                    value={form.policeVerificationDate}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl"
-                    required
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Upload Police Verification
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="file"
-                    name="policeVerification"
-                    accept="application/pdf"
-                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
-                    required
-                    onChange={handleFile}
-                  />
-                  <p className="text-sm text-gray-600 mt-1">Only PDF files allowed, less than 2MB</p>
-                </div>
-                <div>
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Upload 10th Marksheet<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="file"
-                    name="marksheet10"
-                    accept="application/pdf"
-                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
-                    required
-                    onChange={handleFile}
-                  />
-                  <p className="text-sm text-gray-600 mt-1">Only PDF files allowed, less than 2MB</p>
-                </div>
-                <div>
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Upload 12th Marksheet<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="file"
-                    name="marksheet12"
-                    accept="application/pdf"
-                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
-                    required
-                    onChange={handleFile}
-                  />
-                  <p className="text-sm text-gray-600 mt-1">Only PDF files allowed, less than 2MB</p>
-                </div>
-              
-
-              <div className="mt-6">
-                <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Have You Processed Name Change Certificate?
-                  <span className="text-red-500">*</span>
-                </label>
-                <div className="flex space-x-6">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="nameChangeProcessed"
-                      value="Yes"
-                      className="mr-2"
-                      required
-                      onChange={handleChange}
-                    />
-                    Yes
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="nameChangeProcessed"
-                      value="No"
-                      className="mr-2"
-                      required
-                      onChange={handleChange}
-                    />
-                    No
-                  </label>
-                </div>
-              </div>
-
-              {form.nameChangeProcessed === "Yes" && (
-                <div className="mt-4">
-                  <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Upload Name Change Certificate
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="file"
-                    name="nameChangeCertificate"
-                    accept="application/pdf"
-                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
-                    required
-                    onChange={handleFile}
-                  />
-                  <p className="text-sm text-gray-600 mt-1">Only PDF files allowed, less than 2MB</p>
-                </div>
-              )}
-            </section> */}
-
           <section className="mb-12">
             <h3
               className="text-2xl font-bold mb-6 pb-3 inline-block border-b-2"
@@ -2091,7 +1935,7 @@ export default function ConversionRecencyForm() {
                   required
                 />
                 <span className="text-gray-800 font-medium mb-4">
-                  I understand and acknowledge that SkyPro Aviation's partner
+                  I understand and acknowledge that SkyPro Aviation’s partner
                   Flying Training Organisations (FTOs) are DGCA-approved and
                   operate in accordance with DGCA training and safety standards.
                   I further understand that flying training involves inherent
@@ -2100,7 +1944,15 @@ export default function ConversionRecencyForm() {
                   incident or accident that may occur during flight training for
                   license conversion or recency, and I agree that SkyPro
                   Aviation shall not be held responsible or liable in any
-                  manner.
+                  manner. I further understand and agree that if I fail to
+                  perform satisfactorily during any checks, fail to obtain solo
+                  release in the first attempt, or if there is any delay arising
+                  due to my performance, skill level, preparedness, or
+                  competency, then the 7-day commitment and 15-day completion
+                  guarantee provided by SkyPro Aviation shall no longer be
+                  applicable. Any additional training, time, or costs resulting
+                  from such performance-related delays shall be my sole
+                  responsibility.
                   <span className="text-red-500">*</span>
                 </span>
               </label>
