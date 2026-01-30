@@ -204,11 +204,11 @@ export default function NavbarHero() {
 
         <div className="relative z-10 flex h-full items-center justify-center px-4">
           <div className="text-center text-white">
-            <h1 className="text-3xl font-bold md:text-6xl">Admission Form</h1>
+            <h1 className="text-3xl font-bold md:text-6xl w-[100%] lg:w-[80%] mx-auto">Conversion and Recency Admission Form</h1>
             <div className="mt-4 text-sm md:text-base">
               <span className=""><a href="" target="_blank">Home</a></span>
               <span className="mx-2">|</span>
-              <span className="font-semibold text-yellow-400">Admission Form</span>
+              <span className="font-semibold text-yellow-400">Conversion and Recency Admission Form</span>
             </div>
           </div>
         </div>
