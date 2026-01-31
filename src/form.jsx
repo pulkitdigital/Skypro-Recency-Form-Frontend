@@ -61,7 +61,8 @@ export default function ConversionRecencyForm() {
       aircraft: "",
       category: "",
       typeOfFlight: "",
-      ldgTo: "",
+      ldg: "",
+      to: "",
       hours: "",
       minutes: "",
       dateFlown: "",
@@ -71,6 +72,20 @@ export default function ConversionRecencyForm() {
   const [dgcaExamDetails, setDgcaExamDetails] = useState([]);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  // Helper function to convert DD/MM/YYYY to YYYY-MM-DD for date input
+  const formatDateForInput = (ddmmyyyy) => {
+    if (!ddmmyyyy || ddmmyyyy.length !== 10) return "";
+    const [day, month, year] = ddmmyyyy.split("/");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
+  const formatDateForDisplay = (yyyymmdd) => {
+    if (!yyyymmdd) return "";
+    const [year, month, day] = yyyymmdd.split("-");
+    return `${day}/${month}/${year}`;
+  };
 
   // Helper function to convert HH:MM to decimal hours
   const timeToDecimal = (hours, minutes) => {
@@ -138,38 +153,59 @@ export default function ConversionRecencyForm() {
   // Calculate IR Check validity (6 months from date)
   useEffect(() => {
     if (form.irCheckDate) {
-      const date = new Date(form.irCheckDate);
-      date.setMonth(date.getMonth() + 6);
-      setForm((prev) => ({
-        ...prev,
-        irCheckValidity: date.toISOString().split("T")[0],
-      }));
+      const checkDate = new Date(form.irCheckDate);
+      const validityDate = new Date(checkDate);
+      validityDate.setMonth(validityDate.getMonth() + 6);
+      const today = new Date();
+      
+      if (validityDate < today) {
+        setForm((prev) => ({
+          ...prev,
+          irCheckValidity: "OUT OF RECENCY",
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          irCheckValidity: formatDateForDisplay(validityDate.toISOString().split("T")[0]),
+        }));
+      }
     }
   }, [form.irCheckDate]);
 
   // Calculate Signal Reception validity (6 months from date)
   useEffect(() => {
     if (form.signalReceptionDate) {
-      const date = new Date(form.signalReceptionDate);
-      date.setMonth(date.getMonth() + 6);
-      setForm((prev) => ({
-        ...prev,
-        signalReceptionValidity: date.toISOString().split("T")[0],
-      }));
+      const checkDate = new Date(form.signalReceptionDate);
+      const validityDate = new Date(checkDate);
+      validityDate.setMonth(validityDate.getMonth() + 6);
+      const today = new Date();
+      
+      if (validityDate < today) {
+        setForm((prev) => ({
+          ...prev,
+          signalReceptionValidity: "OUT OF RECENCY",
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          signalReceptionValidity: formatDateForDisplay(validityDate.toISOString().split("T")[0]),
+        }));
+      }
     }
   }, [form.signalReceptionDate]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
+    /* ---------- DGCA EXAMS ---------- */
     if (name.startsWith("dgcaExams.")) {
       const examName = name.split(".")[1];
+
       setForm((prev) => ({
         ...prev,
         dgcaExams: { ...prev.dgcaExams, [examName]: checked },
       }));
 
-      // Add or remove exam details
       if (checked) {
         setDgcaExamDetails((prev) => [
           ...prev,
@@ -178,9 +214,37 @@ export default function ConversionRecencyForm() {
       } else {
         setDgcaExamDetails((prev) => prev.filter((d) => d.exam !== examName));
       }
-    } else {
-      setForm({ ...form, [name]: type === "checkbox" ? checked : value });
+      return;
     }
+
+    /* ---------- ALLOW EMPTY ---------- */
+    if (value === "") {
+      setForm({ ...form, [name]: "" });
+      return;
+    }
+
+    /* ---------- AGE (2 digits, 18–99) ---------- */
+    if (name === "age") {
+      // max 2 digits only
+      if (!/^\d{1,2}$/.test(value)) return;
+
+      setForm({ ...form, age: value });
+      return;
+    }
+
+    /* ---------- PIC HOURS (3 digits only) ---------- */
+    if (name === "totalPICExperience" || name === "totalPICXC" || name === "totalInstrumentTime") {
+      if (!/^\d{1,3}$/.test(value)) return;
+
+      setForm({ ...form, [name]: value });
+      return;
+    }
+
+    /* ---------- DEFAULT ---------- */
+    setForm({
+      ...form,
+      [name]: type === "checkbox" ? checked : value,
+    });
   };
 
   const validateImageDimensions = (file, fieldName) => {
@@ -305,7 +369,8 @@ export default function ConversionRecencyForm() {
         aircraft: "",
         category: "",
         typeOfFlight: "",
-        ldgTo: "",
+        ldg: "",
+        to: "",
         hours: "",
         minutes: "",
         dateFlown: "",
@@ -326,6 +391,13 @@ export default function ConversionRecencyForm() {
         if (row.id === id) {
           const updated = { ...row, [field]: value };
 
+          // Validate LDG and TO inputs (only 2 digits allowed)
+          if (field === "ldg" || field === "to") {
+            if (value && !/^\d{0,2}$/.test(value)) {
+              return row; // Don't update if validation fails
+            }
+          }
+
           // Calculate validity (6 months from dateFlown)
           if (field === "dateFlown" && value) {
             const date = new Date(value);
@@ -335,7 +407,7 @@ export default function ConversionRecencyForm() {
             if (date < today) {
               updated.validity = "OUT OF RECENCY";
             } else {
-              updated.validity = date.toISOString().split("T")[0];
+              updated.validity = formatDateForDisplay(date.toISOString().split("T")[0]);
             }
           }
 
@@ -376,10 +448,17 @@ export default function ConversionRecencyForm() {
 
           // Calculate validity (2.5 years from resultDate)
           if (field === "resultDate" && value) {
-            const date = new Date(value);
-            date.setFullYear(date.getFullYear() + 2);
-            date.setMonth(date.getMonth() + 6);
-            updated.validity = date.toISOString().split("T")[0];
+            const resultDate = new Date(value);
+            const validityDate = new Date(resultDate);
+            validityDate.setFullYear(validityDate.getFullYear() + 2);
+            validityDate.setMonth(validityDate.getMonth() + 6);
+            const today = new Date();
+            
+            if (validityDate < today) {
+              updated.validity = "OUT OF RECENCY";
+            } else {
+              updated.validity = formatDateForDisplay(validityDate.toISOString().split("T")[0]);
+            }
           }
 
           return updated;
@@ -403,15 +482,39 @@ export default function ConversionRecencyForm() {
     setStatus("");
 
     const formData = new FormData();
-    Object.keys(form).forEach((key) => {
+    
+    // Convert all date fields to DD/MM/YYYY format before submitting
+    const formWithFormattedDates = { ...form };
+    if (form.licenseValidity) formWithFormattedDates.licenseValidity = formatDateForDisplay(form.licenseValidity);
+    if (form.lastFlightDate) formWithFormattedDates.lastFlightDate = formatDateForDisplay(form.lastFlightDate);
+    if (form.irCheckDate) formWithFormattedDates.irCheckDate = formatDateForDisplay(form.irCheckDate);
+    if (form.signalReceptionDate) formWithFormattedDates.signalReceptionDate = formatDateForDisplay(form.signalReceptionDate);
+    if (form.c172CheckrideDate) formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(form.c172CheckrideDate);
+    if (form.medicalValidity) formWithFormattedDates.medicalValidity = formatDateForDisplay(form.medicalValidity);
+    if (form.policeVerificationDate) formWithFormattedDates.policeVerificationDate = formatDateForDisplay(form.policeVerificationDate);
+
+    Object.keys(formWithFormattedDates).forEach((key) => {
       if (key === "dgcaExams") {
-        formData.append(key, JSON.stringify(form[key]));
+        formData.append(key, JSON.stringify(formWithFormattedDates[key]));
       } else {
-        formData.append(key, form[key]);
+        formData.append(key, formWithFormattedDates[key]);
       }
     });
-    formData.append("sortieRows", JSON.stringify(sortieRows));
-    formData.append("dgcaExamDetails", JSON.stringify(dgcaExamDetails));
+    
+    // Format sortie rows dates
+    const formattedSortieRows = sortieRows.map(row => ({
+      ...row,
+      dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
+      ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "" // Combine LDG/TO
+    }));
+    formData.append("sortieRows", JSON.stringify(formattedSortieRows));
+    
+    // Format exam details dates
+    const formattedExamDetails = dgcaExamDetails.map(detail => ({
+      ...detail,
+      resultDate: detail.resultDate ? formatDateForDisplay(detail.resultDate) : ""
+    }));
+    formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
 
     Object.keys(files).forEach((key) => formData.append(key, files[key]));
 
@@ -435,7 +538,8 @@ export default function ConversionRecencyForm() {
           aircraft: "",
           category: "",
           typeOfFlight: "",
-          ldgTo: "",
+          ldg: "",
+          to: "",
           hours: "",
           minutes: "",
           dateFlown: "",
@@ -470,7 +574,7 @@ export default function ConversionRecencyForm() {
 
         <form
           onSubmit={handleSubmit}
-          className="bg-white shadow-2xl rounded-3xl p-8 sm:p-12 border border-gray-200"
+          className="bg-white shadow-2xl rounded-3xl p-8 sm:p-12 border border-gray-200 lg:w-[90%] mx-auto"
         >
           {status && (
             <div
@@ -495,13 +599,13 @@ export default function ConversionRecencyForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Full Name (as per official records)
+                  Full Name (As per Official Records)
                   <span className="text-red-500">*</span>
                 </label>
                 <input
                   name="fullName"
                   value={form.fullName}
-                  placeholder="Enter full name"
+                  placeholder="Enter Full Name"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
                   onChange={handleChange}
                   required
@@ -510,21 +614,25 @@ export default function ConversionRecencyForm() {
 
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Date of Birth<span className="text-red-500">*</span>
+                  Age<span className="text-red-500">*</span>
                 </label>
+
                 <input
-                  type="date"
-                  name="dob"
-                  value={form.dob}
+                  type="number"
+                  name="age"
+                  value={form.age}
+                  placeholder="Enter Your Age"
+                  inputMode="numeric"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
                   required
                   onChange={handleChange}
+                  onBlur={() => {
+                    if (form.age && Number(form.age) < 18) {
+                      setForm({ ...form, age: "" });
+                      alert("Age must be 18 or above");
+                    }
+                  }}
                 />
-                {form.age && form.age !== "0" && (
-                  <p className="text-sm text-gray-700 mt-1 font-semibold">
-                    Age: {form.age} years
-                  </p>
-                )}
               </div>
 
               <div>
@@ -554,17 +662,6 @@ export default function ConversionRecencyForm() {
                     />
                     Female
                   </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="Prefer not to say"
-                      className="mr-2 text-blue-500 focus:ring-blue-300"
-                      required
-                      onChange={handleChange}
-                    />
-                    Prefer not to say
-                  </label>
                 </div>
               </div>
 
@@ -577,7 +674,7 @@ export default function ConversionRecencyForm() {
                   name="mobile"
                   value={form.mobile}
                   type="tel"
-                  placeholder="10-digit mobile number"
+                  placeholder="Enter Your 10-Digit Mobile Number"
                   inputMode="numeric"
                   pattern="[0-9]{10}"
                   maxLength={10}
@@ -629,10 +726,10 @@ export default function ConversionRecencyForm() {
                 <a
                   href="https://www.reduceimages.com/"
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener noreferrer nofollow"
                   className="text-blue-600 text-sm mt-1 inline-block hover:underline"
                 >
-                  Click here to resize your photo
+                  Click Here to Resize Your Photo
                 </a>
                 {fileErrors.passportPhoto && (
                   <p className="text-red-600 text-sm mt-1">
@@ -659,13 +756,13 @@ export default function ConversionRecencyForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Which Contracting State License do You Hold?
+                  Which Contracting State License Do You Hold?
                   <span className="text-red-500">*</span>
                 </label>
                 <input
                   name="contractingState"
                   value={form.contractingState}
-                  placeholder="Enter country name"
+                  placeholder="Enter Country Name"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
                   required
                   onChange={handleChange}
@@ -674,7 +771,7 @@ export default function ConversionRecencyForm() {
 
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  License Validity Date<span className="text-red-500">*</span>
+                  License Validity Date (DD/MM/YYYY)<span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -684,6 +781,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {form.licenseValidity && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.licenseValidity)}
+                  </p>
+                )}
               </div>
 
               <div className="md:col-span-2">
@@ -850,7 +952,7 @@ export default function ConversionRecencyForm() {
 
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Date of Last Flight<span className="text-red-500">*</span>
+                  Date of Last Flight (DD/MM/YYYY)<span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -860,6 +962,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {form.lastFlightDate && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.lastFlightDate)}
+                  </p>
+                )}
               </div>
             </div>
           </section>
@@ -918,13 +1025,13 @@ export default function ConversionRecencyForm() {
                             Aircraft
                           </th>
                           <th className="border border-gray-300 px-4 py-2">
-                            SE/ME
+                            Aircraft Category
                           </th>
                           <th className="border border-gray-300 px-4 py-2">
                             Type of Flight
                           </th>
                           <th className="border border-gray-300 px-4 py-2">
-                            LDG/TO
+                            LDG/TO (Only for Night Pic)
                           </th>
                           <th className="border border-gray-300 px-4 py-2">
                             Hours
@@ -933,7 +1040,7 @@ export default function ConversionRecencyForm() {
                             Minutes
                           </th>
                           <th className="border border-gray-300 px-4 py-2">
-                            Date Flown
+                            Date Flown (DD/MM/YYYY)
                           </th>
                           <th className="border border-gray-300 px-4 py-2">
                             Validity
@@ -997,20 +1104,39 @@ export default function ConversionRecencyForm() {
                               </select>
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
-                              <input
-                                type="text"
-                                value={row.ldgTo}
-                                onChange={(e) =>
-                                  handleSortieChange(
-                                    row.id,
-                                    "ldgTo",
-                                    e.target.value,
-                                  )
-                                }
-                                disabled={row.typeOfFlight !== "Night PIC"}
-                                placeholder="LDG__ T/O__"
-                                className="w-full px-2 py-1 border border-gray-300 rounded disabled:bg-gray-100"
-                              />
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={row.ldg}
+                                  onChange={(e) =>
+                                    handleSortieChange(
+                                      row.id,
+                                      "ldg",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={row.typeOfFlight !== "Night PIC"}
+                                  placeholder="--"
+                                  maxLength={2}
+                                  className="w-12 px-2 py-1 border border-gray-300 rounded disabled:bg-gray-100 text-center"
+                                />
+                                <span>/</span>
+                                <input
+                                  type="text"
+                                  value={row.to}
+                                  onChange={(e) =>
+                                    handleSortieChange(
+                                      row.id,
+                                      "to",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={row.typeOfFlight !== "Night PIC"}
+                                  placeholder="--"
+                                  maxLength={2}
+                                  className="w-12 px-2 py-1 border border-gray-300 rounded disabled:bg-gray-100 text-center"
+                                />
+                              </div>
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
                               <input
@@ -1065,7 +1191,11 @@ export default function ConversionRecencyForm() {
                                 type="text"
                                 value={row.validity}
                                 disabled
-                                className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                className={`w-full px-2 py-1 border border-gray-300 rounded text-sm ${
+                                  row.validity === "OUT OF RECENCY" 
+                                    ? "bg-red-100 text-red-700 font-bold" 
+                                    : "bg-gray-100"
+                                }`}
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2 text-center">
@@ -1136,7 +1266,7 @@ export default function ConversionRecencyForm() {
                       <input
                         name="irCheckAircraft"
                         value={form.irCheckAircraft}
-                        placeholder="Enter aircraft type"
+                        placeholder="Enter Aircraft Type"
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300"
                         required
                         onChange={handleChange}
@@ -1144,7 +1274,7 @@ export default function ConversionRecencyForm() {
                     </div>
                     <div>
                       <label className="block text-lg font-bold text-gray-700 mb-2">
-                        Date<span className="text-red-500">*</span>
+                        Date (DD/MM/YYYY)<span className="text-red-500">*</span>
                       </label>
                       <input
                         type="date"
@@ -1154,16 +1284,25 @@ export default function ConversionRecencyForm() {
                         required
                         onChange={handleChange}
                       />
+                      {form.irCheckDate && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          Format: {formatDateForDisplay(form.irCheckDate)}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-lg font-bold text-gray-700 mb-2">
-                        Validity
+                        Validity (DD/MM/YYYY)
                       </label>
                       <input
                         type="text"
                         value={form.irCheckValidity}
                         disabled
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100"
+                        className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
+                          form.irCheckValidity === "OUT OF RECENCY" 
+                            ? "bg-red-100 text-red-700 font-bold" 
+                            : "bg-gray-100"
+                        }`}
                       />
                     </div>
                     <div>
@@ -1183,7 +1322,7 @@ export default function ConversionRecencyForm() {
                         Only PDF files allowed, less than 2MB
                       </p>
                       <a
-                        href="https://imgv2-1-f.scribdassets.com/img/document/405053233/original/22c2fe1893/1?v=1"
+                        href="https://skyproaviation.org/wp-content/uploads/2026/01/Example-CA-40.pdf"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 text-sm inline-block"
@@ -1196,12 +1335,9 @@ export default function ConversionRecencyForm() {
 
                 {/* Signal Reception Test */}
                 <div className="mb-8">
-                  <h4 className="text-xl font-bold text-gray-800 mb-4">
-                    Signal Reception Test
-                  </h4>
                   <div className="mb-4">
                     <label className="block text-lg font-bold text-gray-700 mb-2">
-                      Completed?<span className="text-red-500">*</span>
+                     Signal Reception Test Given?<span className="text-red-500">*</span>
                     </label>
                     <div className="flex space-x-6">
                       <label className="flex items-center">
@@ -1233,7 +1369,7 @@ export default function ConversionRecencyForm() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">
-                          Date<span className="text-red-500">*</span>
+                          Date (DD/MM/YYYY)<span className="text-red-500">*</span>
                         </label>
                         <input
                           type="date"
@@ -1243,16 +1379,25 @@ export default function ConversionRecencyForm() {
                           required
                           onChange={handleChange}
                         />
+                        {form.signalReceptionDate && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Format: {formatDateForDisplay(form.signalReceptionDate)}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">
-                          Validity
+                          Validity (DD/MM/YYYY)
                         </label>
                         <input
                           type="text"
                           value={form.signalReceptionValidity}
                           disabled
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100"
+                          className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
+                            form.signalReceptionValidity === "OUT OF RECENCY" 
+                              ? "bg-red-100 text-red-700 font-bold" 
+                              : "bg-gray-100"
+                          }`}
                         />
                       </div>
                       <div>
@@ -1321,7 +1466,7 @@ export default function ConversionRecencyForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Date of Checkride<span className="text-red-500">*</span>
+                    Date of Checkride (DD/MM/YYYY)<span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
@@ -1331,6 +1476,11 @@ export default function ConversionRecencyForm() {
                     required
                     onChange={handleChange}
                   />
+                  {form.c172CheckrideDate && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      Format: {formatDateForDisplay(form.c172CheckrideDate)}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1431,7 +1581,7 @@ export default function ConversionRecencyForm() {
             >
               6. PIC Experience
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
                   Total PIC Experience<span className="text-red-500">*</span>
@@ -1441,6 +1591,7 @@ export default function ConversionRecencyForm() {
                   value={form.totalPICExperience}
                   type="number"
                   placeholder="Enter hours"
+                  inputMode="numeric"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl"
                   required
                   onChange={handleChange}
@@ -1557,7 +1708,7 @@ export default function ConversionRecencyForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Validity<span className="text-red-500">*</span>
+                  Validity (DD/MM/YYYY)<span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -1567,6 +1718,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {form.medicalValidity && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.medicalValidity)}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1632,7 +1788,7 @@ export default function ConversionRecencyForm() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block font-semibold mb-2">
-                          Exam Result Date
+                          Exam Result Date (DD/MM/YYYY)
                           <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -1648,16 +1804,25 @@ export default function ConversionRecencyForm() {
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                           required
                         />
+                        {detail.resultDate && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Format: {formatDateForDisplay(detail.resultDate)}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block font-semibold mb-2">
-                          Validity
+                          Validity (DD/MM/YYYY)
                         </label>
                         <input
                           type="text"
                           value={detail.validity}
                           disabled
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                          className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${
+                            detail.validity === "OUT OF RECENCY" 
+                              ? "bg-red-100 text-red-700 font-bold" 
+                              : "bg-gray-100"
+                          }`}
                         />
                       </div>
                       <div>
@@ -1681,16 +1846,30 @@ export default function ConversionRecencyForm() {
                 ))}
                 <div className="bg-blue-50 p-4 rounded-lg mt-4">
                   <p className="text-sm text-gray-700">
-                    <strong>Note:</strong> As per DGCA CAR-7, Series B Part-I,
+                    <strong>Note:</strong> As per
+                    (
+                      <a
+                        href="https://www.dgca.gov.in/digigov-portal/Upload?flag=iframeAttachView&attachId=qjWO22wds7BX8Yfa8AvH2A%3D%3D"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                       DGCA CAR-7, Series B Part-I,
+                      </a>
+                      )
                     Point 6.7, for the issuance of SPL, DGCA exam validity
                     should be within a period of 2.5 years.
                   </p>
-                  <ul className="text-sm text-gray-700 dotted ml-6 mt-2 list-disc">
-                    <li>To get Exam Result Date,</li>
+                  <p className="text-sm text-gray-700 mt-2">
+                    <strong>
+                      To get Exam Result Date,
+                    </strong>
+                  </p>
+                  <ol className="text-sm text-gray-700 list-decimal ml-6 mt-2">
                     <li>Log in to your eGCA portal</li>
-                    <li>Click “CPL” on the left menu</li>
+                    <li>Click "CPL" on the left menu</li>
                     <li>Go to the Examination Details</li>
-                  </ul>
+                  </ol>
                   <p className="text-sm text-gray-700 mt-2">
                     <strong>
                       To share the DGCA exam expiry, please follow these steps:
@@ -1759,7 +1938,7 @@ export default function ConversionRecencyForm() {
                   RTR Validity<span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   name="rtrValidity"
                   value={form.rtrValidity}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl"
@@ -1792,7 +1971,7 @@ export default function ConversionRecencyForm() {
               {/* Police Verification Date */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Date of Police Verification
+                  Date of Police Verification (DD/MM/YYYY)
                   <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1803,6 +1982,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {form.policeVerificationDate && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.policeVerificationDate)}
+                  </p>
+                )}
               </div>
 
               {/* Upload Police Verification */}
@@ -1935,7 +2119,7 @@ export default function ConversionRecencyForm() {
                   required
                 />
                 <span className="text-gray-800 font-medium mb-4">
-                  I understand and acknowledge that SkyPro Aviation’s partner
+                  I understand and acknowledge that SkyPro Aviation's partner
                   Flying Training Organisations (FTOs) are DGCA-approved and
                   operate in accordance with DGCA training and safety standards.
                   I further understand that flying training involves inherent
@@ -1992,10 +2176,10 @@ export default function ConversionRecencyForm() {
                   <a
                     href="https://www.reduceimages.com/"
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener noreferrer nofollow"
                     className="text-blue-600 text-sm mt-1 inline-block hover:underline"
                   >
-                    Click here to resize your signature
+                    Click Here to Resize Your Signature
                   </a>
                   {fileErrors.studentSignature && (
                     <p className="text-red-600 text-sm mt-1">
@@ -2094,10 +2278,10 @@ export default function ConversionRecencyForm() {
                   <a
                     href="https://www.reduceimages.com/"
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener noreferrer nofollow"
                     className="text-blue-600 text-sm mt-1 inline-block hover:underline"
                   >
-                    Click here to resize your signature
+                    Click Here to Resize Your Signature
                   </a>
                   {fileErrors.finalSignature && (
                     <p className="text-red-600 text-sm mt-1">
