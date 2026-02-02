@@ -30,13 +30,13 @@ export default function ConversionRecencyForm() {
     c172CheckrideDate: "",
     c172PICOption: "",
     totalPICExperience: "",
-    totalPICXC: "",
+    totalPICCrossCountry: "",
     totalInstrumentTime: "",
     medicalValidity: "",
     dgcaExams: {
       airNavigation: false,
       meteorology: false,
-      regulations: false,
+      airRegulations: false,
       technicalGeneral: false,
       technicalSpecific: false,
       compositePaper: false,
@@ -157,7 +157,7 @@ export default function ConversionRecencyForm() {
       const validityDate = new Date(checkDate);
       validityDate.setMonth(validityDate.getMonth() + 6);
       const today = new Date();
-      
+
       if (validityDate < today) {
         setForm((prev) => ({
           ...prev,
@@ -166,7 +166,9 @@ export default function ConversionRecencyForm() {
       } else {
         setForm((prev) => ({
           ...prev,
-          irCheckValidity: formatDateForDisplay(validityDate.toISOString().split("T")[0]),
+          irCheckValidity: formatDateForDisplay(
+            validityDate.toISOString().split("T")[0],
+          ),
         }));
       }
     }
@@ -179,7 +181,7 @@ export default function ConversionRecencyForm() {
       const validityDate = new Date(checkDate);
       validityDate.setMonth(validityDate.getMonth() + 6);
       const today = new Date();
-      
+
       if (validityDate < today) {
         setForm((prev) => ({
           ...prev,
@@ -188,7 +190,9 @@ export default function ConversionRecencyForm() {
       } else {
         setForm((prev) => ({
           ...prev,
-          signalReceptionValidity: formatDateForDisplay(validityDate.toISOString().split("T")[0]),
+          signalReceptionValidity: formatDateForDisplay(
+            validityDate.toISOString().split("T")[0],
+          ),
         }));
       }
     }
@@ -233,7 +237,11 @@ export default function ConversionRecencyForm() {
     }
 
     /* ---------- PIC HOURS (3 digits only) ---------- */
-    if (name === "totalPICExperience" || name === "totalPICXC" || name === "totalInstrumentTime") {
+    if (
+      name === "totalPICExperience" ||
+      name === "totalPICCrossCountry" ||
+      name === "totalInstrumentTime"
+    ) {
       if (!/^\d{1,3}$/.test(value)) return;
 
       setForm({ ...form, [name]: value });
@@ -407,7 +415,9 @@ export default function ConversionRecencyForm() {
             if (date < today) {
               updated.validity = "OUT OF RECENCY";
             } else {
-              updated.validity = formatDateForDisplay(date.toISOString().split("T")[0]);
+              updated.validity = formatDateForDisplay(
+                date.toISOString().split("T")[0],
+              );
             }
           }
 
@@ -418,10 +428,34 @@ export default function ConversionRecencyForm() {
     );
   };
 
+  // const calculateSortieSummary = () => {
+  //   let totalDayPIC = 0;
+  //   let totalNightPIC = 0;
+  //   let totalIF = 0;
+
+  //   sortieRows.forEach((row) => {
+  //     const hours = parseInt(row.hours) || 0;
+  //     const minutes = parseInt(row.minutes) || 0;
+  //     const totalTime = timeToDecimal(hours, minutes);
+
+  //     if (row.typeOfFlight === "Day PIC") totalDayPIC += totalTime;
+  //     if (row.typeOfFlight === "Night PIC") totalNightPIC += totalTime;
+  //     if (row.typeOfFlight === "IF") totalIF += totalTime;
+  //   });
+
+  //   return {
+  //     totalDayPIC: decimalToTime(totalDayPIC),
+  //     totalNightPIC: decimalToTime(totalNightPIC),
+  //     totalIF: decimalToTime(totalIF),
+  //   };
+  // };
+
   const calculateSortieSummary = () => {
     let totalDayPIC = 0;
     let totalNightPIC = 0;
     let totalIF = 0;
+    let totalNightPICLDG = 0;
+    let totalNightPICTO = 0;
 
     sortieRows.forEach((row) => {
       const hours = parseInt(row.hours) || 0;
@@ -429,7 +463,11 @@ export default function ConversionRecencyForm() {
       const totalTime = timeToDecimal(hours, minutes);
 
       if (row.typeOfFlight === "Day PIC") totalDayPIC += totalTime;
-      if (row.typeOfFlight === "Night PIC") totalNightPIC += totalTime;
+      if (row.typeOfFlight === "Night PIC") {
+        totalNightPIC += totalTime;
+        totalNightPICLDG += parseInt(row.ldg) || 0;
+        totalNightPICTO += parseInt(row.to) || 0;
+      }
       if (row.typeOfFlight === "IF") totalIF += totalTime;
     });
 
@@ -437,8 +475,38 @@ export default function ConversionRecencyForm() {
       totalDayPIC: decimalToTime(totalDayPIC),
       totalNightPIC: decimalToTime(totalNightPIC),
       totalIF: decimalToTime(totalIF),
+      totalNightPICLDG,
+      totalNightPICTO,
     };
   };
+
+  // const handleExamDetailChange = (exam, field, value) => {
+  //   setDgcaExamDetails((prev) =>
+  //     prev.map((detail) => {
+  //       if (detail.exam === exam) {
+  //         const updated = { ...detail, [field]: value };
+
+  //         // Calculate validity (2.5 years from resultDate)
+  //         if (field === "resultDate" && value) {
+  //           const resultDate = new Date(value);
+  //           const validityDate = new Date(resultDate);
+  //           validityDate.setFullYear(validityDate.getFullYear() + 2);
+  //           validityDate.setMonth(validityDate.getMonth() + 6);
+  //           const today = new Date();
+
+  //           if (validityDate < today) {
+  //             updated.validity = "OUT OF RECENCY";
+  //           } else {
+  //             updated.validity = formatDateForDisplay(validityDate.toISOString().split("T")[0]);
+  //           }
+  //         }
+
+  //         return updated;
+  //       }
+  //       return detail;
+  //     }),
+  //   );
+  // };
 
   const handleExamDetailChange = (exam, field, value) => {
     setDgcaExamDetails((prev) =>
@@ -449,15 +517,28 @@ export default function ConversionRecencyForm() {
           // Calculate validity (2.5 years from resultDate)
           if (field === "resultDate" && value) {
             const resultDate = new Date(value);
+            const today = new Date();
+
+            // Calculate 2.5 years validity
             const validityDate = new Date(resultDate);
             validityDate.setFullYear(validityDate.getFullYear() + 2);
             validityDate.setMonth(validityDate.getMonth() + 6);
-            const today = new Date();
-            
-            if (validityDate < today) {
-              updated.validity = "OUT OF RECENCY";
+
+            // Calculate 5 years expiry
+            const expiryDate = new Date(resultDate);
+            expiryDate.setFullYear(expiryDate.getFullYear() + 5);
+
+            if (expiryDate < today) {
+              // More than 5 years old
+              updated.validity = "Expired";
+            } else if (validityDate < today && expiryDate >= today) {
+              // Between 2.5 and 5 years
+              updated.validity = "SPL Exam Required";
             } else {
-              updated.validity = formatDateForDisplay(validityDate.toISOString().split("T")[0]);
+              // Within 2.5 years - valid
+              updated.validity = formatDateForDisplay(
+                validityDate.toISOString().split("T")[0],
+              );
             }
           }
 
@@ -482,16 +563,37 @@ export default function ConversionRecencyForm() {
     setStatus("");
 
     const formData = new FormData();
-    
+
     // Convert all date fields to DD/MM/YYYY format before submitting
     const formWithFormattedDates = { ...form };
-    if (form.licenseValidity) formWithFormattedDates.licenseValidity = formatDateForDisplay(form.licenseValidity);
-    if (form.lastFlightDate) formWithFormattedDates.lastFlightDate = formatDateForDisplay(form.lastFlightDate);
-    if (form.irCheckDate) formWithFormattedDates.irCheckDate = formatDateForDisplay(form.irCheckDate);
-    if (form.signalReceptionDate) formWithFormattedDates.signalReceptionDate = formatDateForDisplay(form.signalReceptionDate);
-    if (form.c172CheckrideDate) formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(form.c172CheckrideDate);
-    if (form.medicalValidity) formWithFormattedDates.medicalValidity = formatDateForDisplay(form.medicalValidity);
-    if (form.policeVerificationDate) formWithFormattedDates.policeVerificationDate = formatDateForDisplay(form.policeVerificationDate);
+    if (form.licenseValidity)
+      formWithFormattedDates.licenseValidity = formatDateForDisplay(
+        form.licenseValidity,
+      );
+    if (form.lastFlightDate)
+      formWithFormattedDates.lastFlightDate = formatDateForDisplay(
+        form.lastFlightDate,
+      );
+    if (form.irCheckDate)
+      formWithFormattedDates.irCheckDate = formatDateForDisplay(
+        form.irCheckDate,
+      );
+    if (form.signalReceptionDate)
+      formWithFormattedDates.signalReceptionDate = formatDateForDisplay(
+        form.signalReceptionDate,
+      );
+    if (form.c172CheckrideDate)
+      formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(
+        form.c172CheckrideDate,
+      );
+    if (form.medicalValidity)
+      formWithFormattedDates.medicalValidity = formatDateForDisplay(
+        form.medicalValidity,
+      );
+    if (form.policeVerificationDate)
+      formWithFormattedDates.policeVerificationDate = formatDateForDisplay(
+        form.policeVerificationDate,
+      );
 
     Object.keys(formWithFormattedDates).forEach((key) => {
       if (key === "dgcaExams") {
@@ -500,19 +602,21 @@ export default function ConversionRecencyForm() {
         formData.append(key, formWithFormattedDates[key]);
       }
     });
-    
+
     // Format sortie rows dates
-    const formattedSortieRows = sortieRows.map(row => ({
+    const formattedSortieRows = sortieRows.map((row) => ({
       ...row,
       dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
-      ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "" // Combine LDG/TO
+      ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "", // Combine LDG/TO
     }));
     formData.append("sortieRows", JSON.stringify(formattedSortieRows));
-    
+
     // Format exam details dates
-    const formattedExamDetails = dgcaExamDetails.map(detail => ({
+    const formattedExamDetails = dgcaExamDetails.map((detail) => ({
       ...detail,
-      resultDate: detail.resultDate ? formatDateForDisplay(detail.resultDate) : ""
+      resultDate: detail.resultDate
+        ? formatDateForDisplay(detail.resultDate)
+        : "",
     }));
     formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
 
@@ -771,7 +875,8 @@ export default function ConversionRecencyForm() {
 
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  License Validity Date (DD/MM/YYYY)<span className="text-red-500">*</span>
+                  License Validity Date (DD/MM/YYYY)
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -952,7 +1057,8 @@ export default function ConversionRecencyForm() {
 
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Date of Last Flight (DD/MM/YYYY)<span className="text-red-500">*</span>
+                  Date of Last Flight (DD/MM/YYYY)
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -1192,8 +1298,8 @@ export default function ConversionRecencyForm() {
                                 value={row.validity}
                                 disabled
                                 className={`w-full px-2 py-1 border border-gray-300 rounded text-sm ${
-                                  row.validity === "OUT OF RECENCY" 
-                                    ? "bg-red-100 text-red-700 font-bold" 
+                                  row.validity === "OUT OF RECENCY"
+                                    ? "bg-red-100 text-red-700 font-bold"
                                     : "bg-gray-100"
                                 }`}
                               />
@@ -1223,7 +1329,7 @@ export default function ConversionRecencyForm() {
                     Add One More Row
                   </button>
 
-                  <div className="mt-6 bg-blue-50 p-4 rounded-lg">
+                  {/* <div className="mt-6 bg-blue-50 p-4 rounded-lg">
                     <h5 className="font-bold text-lg mb-2">Summary</h5>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
@@ -1239,6 +1345,43 @@ export default function ConversionRecencyForm() {
                           {sortieSummary.totalNightPIC.hours} hrs{" "}
                           {sortieSummary.totalNightPIC.minutes} min
                         </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">
+                          Total Instrument Flying:
+                        </p>
+                        <p>
+                          {sortieSummary.totalIF.hours} hrs{" "}
+                          {sortieSummary.totalIF.minutes} min
+                        </p>
+                      </div>
+                    </div>
+                  </div> */}
+
+                  <div className="mt-6 bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-bold text-lg mb-2">Summary</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div>
+                        <p className="font-semibold">Total Day PIC:</p>
+                        <p>
+                          {sortieSummary.totalDayPIC.hours} hrs{" "}
+                          {sortieSummary.totalDayPIC.minutes} min
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">Total Night PIC:</p>
+                        <p>
+                          {sortieSummary.totalNightPIC.hours} hrs{" "}
+                          {sortieSummary.totalNightPIC.minutes} min
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">Total Night PIC TO:</p>
+                        <p>{sortieSummary.totalNightPICTO}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">Total Night PIC LDG:</p>
+                        <p>{sortieSummary.totalNightPICLDG}</p>
                       </div>
                       <div>
                         <p className="font-semibold">
@@ -1290,7 +1433,7 @@ export default function ConversionRecencyForm() {
                         </p>
                       )}
                     </div>
-                    <div>
+                    {/* <div>
                       <label className="block text-lg font-bold text-gray-700 mb-2">
                         Validity (DD/MM/YYYY)
                       </label>
@@ -1299,8 +1442,23 @@ export default function ConversionRecencyForm() {
                         value={form.irCheckValidity}
                         disabled
                         className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
-                          form.irCheckValidity === "OUT OF RECENCY" 
-                            ? "bg-red-100 text-red-700 font-bold" 
+                          form.irCheckValidity === "OUT OF RECENCY"
+                            ? "bg-red-100 text-red-700 font-bold"
+                            : "bg-gray-100"
+                        }`}
+                      />
+                    </div> */}
+                    <div>
+                      <label className="block font-semibold mb-2">
+                        Validity (DD/MM/YYYY)
+                      </label>
+                      <input
+                        type="text"
+                        value={form.irCheckValidity}
+                        disabled
+                        className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
+                          form.irCheckValidity === "OUT OF RECENCY"
+                            ? "bg-red-100 text-red-700 font-bold"
                             : "bg-gray-100"
                         }`}
                       />
@@ -1337,7 +1495,8 @@ export default function ConversionRecencyForm() {
                 <div className="mb-8">
                   <div className="mb-4">
                     <label className="block text-lg font-bold text-gray-700 mb-2">
-                     Signal Reception Test Given?<span className="text-red-500">*</span>
+                      Signal Reception Test Given?
+                      <span className="text-red-500">*</span>
                     </label>
                     <div className="flex space-x-6">
                       <label className="flex items-center">
@@ -1369,7 +1528,8 @@ export default function ConversionRecencyForm() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">
-                          Date (DD/MM/YYYY)<span className="text-red-500">*</span>
+                          Date (DD/MM/YYYY)
+                          <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="date"
@@ -1381,7 +1541,8 @@ export default function ConversionRecencyForm() {
                         />
                         {form.signalReceptionDate && (
                           <p className="text-sm text-gray-600 mt-1">
-                            Format: {formatDateForDisplay(form.signalReceptionDate)}
+                            Format:{" "}
+                            {formatDateForDisplay(form.signalReceptionDate)}
                           </p>
                         )}
                       </div>
@@ -1394,8 +1555,8 @@ export default function ConversionRecencyForm() {
                           value={form.signalReceptionValidity}
                           disabled
                           className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
-                            form.signalReceptionValidity === "OUT OF RECENCY" 
-                              ? "bg-red-100 text-red-700 font-bold" 
+                            form.signalReceptionValidity === "OUT OF RECENCY"
+                              ? "bg-red-100 text-red-700 font-bold"
                               : "bg-gray-100"
                           }`}
                         />
@@ -1466,7 +1627,8 @@ export default function ConversionRecencyForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-lg font-bold text-gray-700 mb-2">
-                    Date of Checkride (DD/MM/YYYY)<span className="text-red-500">*</span>
+                    Date of Checkride (DD/MM/YYYY)
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
@@ -1616,12 +1778,12 @@ export default function ConversionRecencyForm() {
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Upload 300 nm XC Statement
+                  Upload 300 nm Cross Country Statement
                   <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="file"
-                  name="xc300Statement"
+                  name="crossCountry300Statement"
                   accept="application/pdf"
                   className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
                   required
@@ -1637,8 +1799,8 @@ export default function ConversionRecencyForm() {
                   <span className="text-red-500">*</span>
                 </label>
                 <input
-                  name="totalPICXC"
-                  value={form.totalPICXC}
+                  name="totalPICCrossCountry"
+                  value={form.totalPICCrossCountry}
                   type="number"
                   placeholder="Enter hours"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl"
@@ -1653,7 +1815,7 @@ export default function ConversionRecencyForm() {
                 </label>
                 <input
                   type="file"
-                  name="picXCStatement"
+                  name="picCrossCountryStatement"
                   accept="application/pdf"
                   className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl"
                   required
@@ -1753,7 +1915,7 @@ export default function ConversionRecencyForm() {
               {[
                 { key: "airNavigation", label: "Air Navigation" },
                 { key: "meteorology", label: "Meteorology" },
-                { key: "regulations", label: "Regulations" },
+                { key: "airRegulations", label: "Air Regulations" },
                 { key: "technicalGeneral", label: "Technical General" },
                 { key: "technicalSpecific", label: "Technical Specific" },
                 {
@@ -1819,8 +1981,8 @@ export default function ConversionRecencyForm() {
                           value={detail.validity}
                           disabled
                           className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${
-                            detail.validity === "OUT OF RECENCY" 
-                              ? "bg-red-100 text-red-700 font-bold" 
+                            detail.validity === "OUT OF RECENCY"
+                              ? "bg-red-100 text-red-700 font-bold"
                               : "bg-gray-100"
                           }`}
                         />
@@ -1846,24 +2008,20 @@ export default function ConversionRecencyForm() {
                 ))}
                 <div className="bg-blue-50 p-4 rounded-lg mt-4">
                   <p className="text-sm text-gray-700">
-                    <strong>Note:</strong> As per
-                    (
-                      <a
-                        href="https://www.dgca.gov.in/digigov-portal/Upload?flag=iframeAttachView&attachId=qjWO22wds7BX8Yfa8AvH2A%3D%3D"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                       DGCA CAR-7, Series B Part-I,
-                      </a>
-                      )
-                    Point 6.7, for the issuance of SPL, DGCA exam validity
+                    <strong>Note:</strong> As per (
+                    <a
+                      href="https://www.dgca.gov.in/digigov-portal/Upload?flag=iframeAttachView&attachId=qjWO22wds7BX8Yfa8AvH2A%3D%3D"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      DGCA CAR-7, Series B Part-I,
+                    </a>
+                    ) Point 6.7, for the issuance of SPL, DGCA exam validity
                     should be within a period of 2.5 years.
                   </p>
                   <p className="text-sm text-gray-700 mt-2">
-                    <strong>
-                      To get Exam Result Date,
-                    </strong>
+                    <strong>To get Exam Result Date,</strong>
                   </p>
                   <ol className="text-sm text-gray-700 list-decimal ml-6 mt-2">
                     <li>Log in to your eGCA portal</li>
@@ -2128,7 +2286,9 @@ export default function ConversionRecencyForm() {
                   incident or accident that may occur during flight training for
                   license conversion or recency, and I agree that SkyPro
                   Aviation shall not be held responsible or liable in any
-                  manner. I further understand and agree that if I fail to
+                  manner.
+                  <br></br>
+                  <br></br>I further understand and agree that if I fail to
                   perform satisfactorily during any checks, fail to obtain solo
                   release in the first attempt, or if there is any delay arising
                   due to my performance, skill level, preparedness, or
