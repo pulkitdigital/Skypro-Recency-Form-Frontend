@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function ConversionRecencyForm() {
   const initialState = {
@@ -70,8 +71,10 @@ export default function ConversionRecencyForm() {
     },
   ]);
   const [dgcaExamDetails, setDgcaExamDetails] = useState([]);
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
   // Helper function to convert DD/MM/YYYY to YYYY-MM-DD for date input
   const formatDateForInput = (ddmmyyyy) => {
@@ -622,6 +625,11 @@ export default function ConversionRecencyForm() {
 
     Object.keys(files).forEach((key) => formData.append(key, files[key]));
 
+    // Add reCAPTCHA token
+    if (recaptchaToken) {
+      formData.append("recaptchaToken", recaptchaToken);
+    }
+
     try {
       await Promise.all([
         axios.post(`${API_URL}/api/submit-conversion`, formData, {
@@ -636,6 +644,7 @@ export default function ConversionRecencyForm() {
       setFileErrors({});
       setDisclaimerAccepted(false);
       setDeclarationAccepted(false);
+      setRecaptchaToken(null);
       setSortieRows([
         {
           id: Date.now(),
@@ -2467,10 +2476,20 @@ export default function ConversionRecencyForm() {
             </div>
           </section>
 
+          {/* reCAPTCHA */}
+          <section className="mb-8">
+            <div className="flex justify-center">
+              <ReCAPTCHA
+                sitekey={RECAPTCHA_SITE_KEY}
+                onChange={setRecaptchaToken}
+              />
+            </div>
+          </section>
+
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !disclaimerAccepted || !declarationAccepted}
+            disabled={loading || !disclaimerAccepted || !declarationAccepted || !recaptchaToken}
             className="w-full bg-[#003366] hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-2xl text-xl shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500"
           >
             {loading ? "Submitting..." : "Submit Application"}
