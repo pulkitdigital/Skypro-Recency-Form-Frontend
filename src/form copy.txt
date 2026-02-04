@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import ReCAPTCHA from "react-google-recaptcha";
-import FormHeader from "./FormHeader";
-import ThankYouPopup from "./ThankYouPopup";
 
 export default function ConversionRecencyForm() {
   const initialState = {
@@ -74,8 +72,6 @@ export default function ConversionRecencyForm() {
   ]);
   const [dgcaExamDetails, setDgcaExamDetails] = useState([]);
   const [recaptchaToken, setRecaptchaToken] = useState(null);
-  const [showThankYouPopup, setShowThankYouPopup] = useState(false);
-  const formRef = useRef(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
@@ -86,18 +82,6 @@ export default function ConversionRecencyForm() {
     const [day, month, year] = ddmmyyyy.split("/");
     return `${year}-${month}-${day}`;
   };
-
-  const formatExamName = (examKey) => {
-  const examNames = {
-    airNavigation: "Air Navigation",
-    meteorology: "Meteorology",
-    airRegulations: "Air Regulations",
-    technicalGeneral: "Technical General",
-    technicalSpecific: "Technical Specific",
-    compositePaper: "Composite Paper (Meteorology + Navigation)",
-  };
-  return examNames[examKey] || examKey;
-};
 
   // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
   const formatDateForDisplay = (yyyymmdd) => {
@@ -175,7 +159,6 @@ export default function ConversionRecencyForm() {
       const checkDate = new Date(form.irCheckDate);
       const validityDate = new Date(checkDate);
       validityDate.setMonth(validityDate.getMonth() + 6);
-      validityDate.setDate(validityDate.getDate() - 1);
       const today = new Date();
 
       if (validityDate < today) {
@@ -200,7 +183,6 @@ export default function ConversionRecencyForm() {
       const checkDate = new Date(form.signalReceptionDate);
       const validityDate = new Date(checkDate);
       validityDate.setMonth(validityDate.getMonth() + 6);
-      validityDate.setDate(validityDate.getDate() - 1);
       const today = new Date();
 
       if (validityDate < today) {
@@ -270,9 +252,6 @@ export default function ConversionRecencyForm() {
     }
 
     /* ---------- DEFAULT ---------- */
-    if (name === "totalSEMinutes" || name === "totalMEMinutes") {
-      if (!/^\d{1,2}$/.test(value) || parseInt(value) > 59) return;
-    }
     setForm({
       ...form,
       [name]: type === "checkbox" ? checked : value,
@@ -430,26 +409,11 @@ export default function ConversionRecencyForm() {
             }
           }
 
-          // Validate hours (2 digits)
-          if (field === "hours") {
-            if (value && !/^\d{1,2}$/.test(value)) {
-              return row;
-            }
-          }
-
-          // Validate minutes (2 digits, <=59)
-          if (field === "minutes") {
-            if (value && (!/^\d{1,2}$/.test(value) || parseInt(value) > 59)) {
-              return row;
-            }
-          }
-
           // Calculate validity (6 months from dateFlown)
           if (field === "dateFlown" && value) {
             const date = new Date(value);
             const today = new Date();
             date.setMonth(date.getMonth() + 6);
-            date.setDate(date.getDate() - 1);
 
             if (date < today) {
               updated.validity = "OUT OF RECENCY";
@@ -547,66 +511,25 @@ export default function ConversionRecencyForm() {
   //   );
   // };
 
-  // const handleExamDetailChange = (exam, field, value) => {
-  //   setDgcaExamDetails((prev) =>
-  //     prev.map((detail) => {
-  //       if (detail.exam === exam) {
-  //         const updated = { ...detail, [field]: value };
-
-  //         // Calculate validity (2.5 years from resultDate)
-  //         if (field === "resultDate" && value) {
-  //           const resultDate = new Date(value);
-  //           const today = new Date();
-
-  //           // Calculate 2.5 years validity
-  //           const validityDate = new Date(resultDate);
-  //           validityDate.setFullYear(validityDate.getFullYear() + 2);
-  //           validityDate.setMonth(validityDate.getMonth() + 6);
-  //         validityDate.setDate(validityDate.getDate() - 1);
-
-  //           if (expiryDate < today) {
-  //             // More than 5 years old
-  //             updated.validity = "Expired";
-  //           } else if (validityDate < today && expiryDate >= today) {
-  //             // Between 2.5 and 5 years
-  //             updated.validity = "SPL Exam Required";
-  //           } else {
-  //             // Within 2.5 years - valid
-  //             updated.validity = formatDateForDisplay(
-  //               validityDate.toISOString().split("T")[0],
-  //             );
-  //           }
-  //         }
-
-  //         return updated;
-  //       }
-  //       return detail;
-  //     }),
-  //   );
-  // };
-
   const handleExamDetailChange = (exam, field, value) => {
     setDgcaExamDetails((prev) =>
       prev.map((detail) => {
         if (detail.exam === exam) {
           const updated = { ...detail, [field]: value };
 
-          // ⚠️ FIXED: Calculate validity (2.5 years from resultDate)
+          // Calculate validity (2.5 years from resultDate)
           if (field === "resultDate" && value) {
             const resultDate = new Date(value);
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
 
             // Calculate 2.5 years validity
             const validityDate = new Date(resultDate);
             validityDate.setFullYear(validityDate.getFullYear() + 2);
             validityDate.setMonth(validityDate.getMonth() + 6);
-            validityDate.setDate(validityDate.getDate() - 1);
 
             // Calculate 5 years expiry
             const expiryDate = new Date(resultDate);
             expiryDate.setFullYear(expiryDate.getFullYear() + 5);
-            expiryDate.setDate(expiryDate.getDate() - 1);
 
             if (expiryDate < today) {
               // More than 5 years old
@@ -631,22 +554,6 @@ export default function ConversionRecencyForm() {
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const scrollToError = () => {
-    setTimeout(() => {
-      const errorElement = document.querySelector(
-        ".border-red-400, .text-red-600, .bg-red-50",
-      );
-      if (errorElement) {
-        const section = errorElement.closest("section");
-        if (section) {
-          section.scrollIntoView({ behavior: "smooth", block: "center" });
-        } else {
-          errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }
-    }, 100);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -659,35 +566,28 @@ export default function ConversionRecencyForm() {
     setStatus("");
 
     // Validate required files
-    let requiredFiles = [
-      "passportPhoto",
-      "foreignLicense",
-      "studentSignature",
-      "finalSignature",
-    ];
-
+    let requiredFiles = ['passportPhoto', 'foreignLicense', 'studentSignature', 'finalSignature'];
+    
     if (form.last6MonthsAvailable === "Yes") {
-      requiredFiles.push("ca40IR");
+      requiredFiles.push('ca40IR');
       if (form.signalReception === "Yes") {
-        requiredFiles.push("signalReceptionTest");
+        requiredFiles.push('signalReceptionTest');
       }
     }
 
     if (form.commercialCheckride === "C172") {
-      requiredFiles.push("c172CheckrideStatement");
+      requiredFiles.push('c172CheckrideStatement');
     } else if (form.c172PICOption === "flightReview") {
-      requiredFiles.push("c172FlightReview");
+      requiredFiles.push('c172FlightReview');
     }
 
     if (form.nameChangeProcessed === "Yes") {
-      requiredFiles.push("nameChangeCertificate");
+      requiredFiles.push('nameChangeCertificate');
     }
 
-    const missingFiles = requiredFiles.filter((field) => !files[field]);
+    const missingFiles = requiredFiles.filter(field => !files[field]);
     if (missingFiles.length > 0) {
-      setStatus(
-        `❌ Please upload all required files: ${missingFiles.join(", ")}`,
-      );
+      setStatus(`❌ Please upload all required files: ${missingFiles.join(', ')}`);
       setLoading(false);
       return;
     }
@@ -757,43 +657,6 @@ export default function ConversionRecencyForm() {
       formData.append("recaptchaToken", recaptchaToken);
     }
 
-    // try {
-    //   await Promise.all([
-    //     axios.post(`${API_URL}/api/submit-conversion`, formData, {
-    //       headers: { "Content-Type": "multipart/form-data" },
-    //     }),
-    //     delay(5000),
-    //   ]);
-
-    //   setStatus("✅ Form submitted successfully");
-    //   setForm(initialState);
-    //   setFiles({});
-    //   setFileErrors({});
-    //   setDisclaimerAccepted(false);
-    //   setDeclarationAccepted(false);
-    //   setRecaptchaToken(null);
-    //   setSortieRows([
-    //     {
-    //       id: Date.now(),
-    //       aircraft: "",
-    //       category: "",
-    //       typeOfFlight: "",
-    //       ldg: "",
-    //       to: "",
-    //       hours: "",
-    //       minutes: "",
-    //       dateFlown: "",
-    //       validity: "",
-    //     },
-    //   ]);
-    //   setDgcaExamDetails([]);
-    //   e.target.reset();
-    // } catch (err) {
-    //   setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
-    // } finally {
-    //   setLoading(false);
-    // }
-
     try {
       await Promise.all([
         axios.post(`${API_URL}/api/submit-conversion`, formData, {
@@ -802,11 +665,7 @@ export default function ConversionRecencyForm() {
         delay(5000),
       ]);
 
-      // ⚠️ UPDATED: Show popup instead of just status message
-      setShowThankYouPopup(true);
-      setStatus("");
-
-      // Reset form
+      setStatus("✅ Form submitted successfully");
       setForm(initialState);
       setFiles({});
       setFileErrors({});
@@ -829,12 +688,8 @@ export default function ConversionRecencyForm() {
       ]);
       setDgcaExamDetails([]);
       e.target.reset();
-
-      // Scroll to top
-      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
-      scrollToError(); // ⚠️ ADD THIS LINE - Scroll to error
     } finally {
       setLoading(false);
     }
@@ -845,10 +700,19 @@ export default function ConversionRecencyForm() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <FormHeader />
+        <div className="text-center mb-12">
+          <h2
+            className="text-3xl sm:text-5xl font-bold mb-2"
+            style={{ color: "black" }}
+          >
+            Conversion and Recency Admission Form
+          </h2>
+          <p className="text-xl font-bold" style={{ color: "#f4b221" }}>
+            SkyPro Aviation Academy
+          </p>
+        </div>
 
         <form
-          ref={formRef}
           onSubmit={handleSubmit}
           className="bg-white shadow-2xl rounded-3xl p-8 sm:p-12 border border-gray-200 lg:w-[90%] mx-auto"
         >
@@ -1058,6 +922,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {/* {form.licenseValidity && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.licenseValidity)}
+                  </p>
+                )} */}
               </div>
 
               <div className="md:col-span-2">
@@ -1235,6 +1104,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {/* {form.lastFlightDate && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.lastFlightDate)}
+                  </p>
+                )} */}
               </div>
             </div>
           </section>
@@ -1333,7 +1207,6 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
-                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1347,7 +1220,6 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
-                                required
                               >
                                 <option value="">Select</option>
                                 <option value="SE">SE</option>
@@ -1365,7 +1237,6 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
-                                required
                               >
                                 <option value="">Select</option>
                                 <option value="Dual">Dual</option>
@@ -1413,7 +1284,7 @@ export default function ConversionRecencyForm() {
                               <input
                                 type="number"
                                 min="0"
-                                max="99"
+                                max="999"
                                 value={row.hours}
                                 onChange={(e) =>
                                   handleSortieChange(
@@ -1424,7 +1295,6 @@ export default function ConversionRecencyForm() {
                                 }
                                 placeholder="HH"
                                 className="w-full px-2 py-1 border border-gray-300 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1442,7 +1312,6 @@ export default function ConversionRecencyForm() {
                                 }
                                 placeholder="MM"
                                 className="w-full px-2 py-1 border border-gray-300 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1457,7 +1326,6 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
-                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1595,6 +1463,11 @@ export default function ConversionRecencyForm() {
                         required
                         onChange={handleChange}
                       />
+                      {/* {form.irCheckDate && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          Format: {formatDateForDisplay(form.irCheckDate)}
+                        </p>
+                      )} */}
                     </div>
                     {/* <div>
                       <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1716,6 +1589,12 @@ export default function ConversionRecencyForm() {
                           required
                           onChange={handleChange}
                         />
+                        {/* {form.signalReceptionDate && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Format:{" "}
+                            {formatDateForDisplay(form.signalReceptionDate)}
+                          </p>
+                        )} */}
                       </div>
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1757,12 +1636,11 @@ export default function ConversionRecencyForm() {
                             {fileErrors.signalReceptionTest}
                           </p>
                         )}
-                        {files.signalReceptionTest &&
-                          !fileErrors.signalReceptionTest && (
-                            <p className="text-green-600 text-sm mt-1">
-                              ✓ {files.signalReceptionTest.name}
-                            </p>
-                          )}
+                        {files.signalReceptionTest && !fileErrors.signalReceptionTest && (
+                          <p className="text-green-600 text-sm mt-1">
+                            ✓ {files.signalReceptionTest.name}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1824,6 +1702,11 @@ export default function ConversionRecencyForm() {
                     required
                     onChange={handleChange}
                   />
+                  {/* {form.c172CheckrideDate && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      Format: {formatDateForDisplay(form.c172CheckrideDate)}
+                    </p>
+                  )} */}
                 </div>
                 <div>
                   <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1850,12 +1733,11 @@ export default function ConversionRecencyForm() {
                       {fileErrors.c172CheckrideStatement}
                     </p>
                   )}
-                  {files.c172CheckrideStatement &&
-                    !fileErrors.c172CheckrideStatement && (
-                      <p className="text-green-600 text-sm mt-1">
-                        ✓ {files.c172CheckrideStatement.name}
-                      </p>
-                    )}
+                  {files.c172CheckrideStatement && !fileErrors.c172CheckrideStatement && (
+                    <p className="text-green-600 text-sm mt-1">
+                      ✓ {files.c172CheckrideStatement.name}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -2025,12 +1907,11 @@ export default function ConversionRecencyForm() {
                     {fileErrors.crossCountry300Statement}
                   </p>
                 )}
-                {files.crossCountry300Statement &&
-                  !fileErrors.crossCountry300Statement && (
-                    <p className="text-green-600 text-sm mt-1">
-                      ✓ {files.crossCountry300Statement.name}
-                    </p>
-                  )}
+                {files.crossCountry300Statement && !fileErrors.crossCountry300Statement && (
+                  <p className="text-green-600 text-sm mt-1">
+                    ✓ {files.crossCountry300Statement.name}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -2072,12 +1953,11 @@ export default function ConversionRecencyForm() {
                     {fileErrors.picCrossCountryStatement}
                   </p>
                 )}
-                {files.picCrossCountryStatement &&
-                  !fileErrors.picCrossCountryStatement && (
-                    <p className="text-green-600 text-sm mt-1">
-                      ✓ {files.picCrossCountryStatement.name}
-                    </p>
-                  )}
+                {files.picCrossCountryStatement && !fileErrors.picCrossCountryStatement && (
+                  <p className="text-green-600 text-sm mt-1">
+                    ✓ {files.picCrossCountryStatement.name}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -2118,12 +1998,11 @@ export default function ConversionRecencyForm() {
                     {fileErrors.instrumentTimeStatement}
                   </p>
                 )}
-                {files.instrumentTimeStatement &&
-                  !fileErrors.instrumentTimeStatement && (
-                    <p className="text-green-600 text-sm mt-1">
-                      ✓ {files.instrumentTimeStatement.name}
-                    </p>
-                  )}
+                {files.instrumentTimeStatement && !fileErrors.instrumentTimeStatement && (
+                  <p className="text-green-600 text-sm mt-1">
+                    ✓ {files.instrumentTimeStatement.name}
+                  </p>
+                )}
               </div>
             </div>
           </section>
@@ -2149,6 +2028,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {/* {form.medicalValidity && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.medicalValidity)}
+                  </p>
+                )} */}
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -2222,11 +2106,8 @@ export default function ConversionRecencyForm() {
                     key={detail.exam}
                     className="mb-6 p-4 border border-gray-300 rounded-xl"
                   >
-                    {/* <h6 className="font-bold mb-3 capitalize">
+                    <h6 className="font-bold mb-3 capitalize">
                       {detail.exam.replace(/([A-Z])/g, " $1").trim()}
-                    </h6> */}
-                    <h6 className="font-bold mb-3">
-                      {formatExamName(detail.exam)}
                     </h6>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -2247,6 +2128,11 @@ export default function ConversionRecencyForm() {
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                           required
                         />
+                        {/* {detail.resultDate && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Format: {formatDateForDisplay(detail.resultDate)}
+                          </p>
+                        )} */}
                       </div>
                       <div>
                         <label className="block font-semibold mb-2">
@@ -2287,12 +2173,11 @@ export default function ConversionRecencyForm() {
                             {fileErrors[`dgcaExam_${detail.exam}`]}
                           </p>
                         )}
-                        {files[`dgcaExam_${detail.exam}`] &&
-                          !fileErrors[`dgcaExam_${detail.exam}`] && (
-                            <p className="text-green-600 text-sm mt-1">
-                              ✓ {files[`dgcaExam_${detail.exam}`].name}
-                            </p>
-                          )}
+                        {files[`dgcaExam_${detail.exam}`] && !fileErrors[`dgcaExam_${detail.exam}`] && (
+                          <p className="text-green-600 text-sm mt-1">
+                            ✓ {files[`dgcaExam_${detail.exam}`].name}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2459,6 +2344,11 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
+                {/* {form.policeVerificationDate && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Format: {formatDateForDisplay(form.policeVerificationDate)}
+                  </p>
+                )} */}
               </div>
 
               {/* Upload Police Verification */}
@@ -2606,12 +2496,11 @@ export default function ConversionRecencyForm() {
                     {fileErrors.nameChangeCertificate}
                   </p>
                 )}
-                {files.nameChangeCertificate &&
-                  !fileErrors.nameChangeCertificate && (
-                    <p className="text-green-600 text-sm mt-1">
-                      ✓ {files.nameChangeCertificate.name}
-                    </p>
-                  )}
+                {files.nameChangeCertificate && !fileErrors.nameChangeCertificate && (
+                  <p className="text-green-600 text-sm mt-1">
+                    ✓ {files.nameChangeCertificate.name}
+                  </p>
+                )}
               </div>
             )}
           </section>
@@ -2636,27 +2525,28 @@ export default function ConversionRecencyForm() {
                 <span className="text-gray-800 font-medium mb-4">
                   <p className="mb-2">
                     I understand and acknowledge that SkyPro Aviation's partner
-                    Flying Training Organisations (FTOs) are DGCA-approved and
-                    operate in accordance with DGCA training and safety
-                    standards. I further understand that flying training
-                    involves inherent risks. Having fully understood these
-                    risks, I voluntarily undertake sole responsibility for my
-                    safety and for any incident or accident that may occur
-                    during flight training for license conversion or recency,
-                    and I agree that SkyPro Aviation shall not be held
-                    responsible or liable in any manner.
+                  Flying Training Organisations (FTOs) are DGCA-approved and
+                  operate in accordance with DGCA training and safety standards.
+                  I further understand that flying training involves inherent
+                  risks. Having fully understood these risks, I voluntarily
+                  undertake sole responsibility for my safety and for any
+                  incident or accident that may occur during flight training for
+                  license conversion or recency, and I agree that SkyPro
+                  Aviation shall not be held responsible or liable in any
+                  manner.
                   </p>
                   <p>
-                    I further understand and agree that if I fail to perform
-                    satisfactorily during any checks, fail to obtain solo
-                    release in the first attempt, or if there is any delay
-                    arising due to my performance, skill level, preparedness, or
-                    competency, then the 7-day commitment and 15-day completion
-                    guarantee provided by SkyPro Aviation shall no longer be
-                    applicable. Any additional training, time, or costs
-                    resulting from such performance-related delays shall be my
-                    sole responsibility.<span className="text-red-500">*</span>
+                    I further understand and agree that if I fail to
+                  perform satisfactorily during any checks, fail to obtain solo
+                  release in the first attempt, or if there is any delay arising
+                  due to my performance, skill level, preparedness, or
+                  competency, then the 7-day commitment and 15-day completion
+                  guarantee provided by SkyPro Aviation shall no longer be
+                  applicable. Any additional training, time, or costs resulting
+                  from such performance-related delays shall be my sole
+                  responsibility.<span className="text-red-500">*</span>
                   </p>
+                  
                 </span>
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2839,22 +2729,13 @@ export default function ConversionRecencyForm() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={
-              loading ||
-              !disclaimerAccepted ||
-              !declarationAccepted ||
-              !recaptchaToken
-            }
+            disabled={loading || !disclaimerAccepted || !declarationAccepted || !recaptchaToken}
             className="w-full bg-[#003366] hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-2xl text-xl shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500"
           >
             {loading ? "Submitting..." : "Submit Application"}
           </button>
         </form>
       </div>
-      <ThankYouPopup 
-        isOpen={showThankYouPopup} 
-        onClose={() => setShowThankYouPopup(false)} 
-      />
     </div>
   );
 }
