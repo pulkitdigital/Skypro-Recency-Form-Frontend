@@ -50,7 +50,7 @@ const Footer = () => {
                   rel="noreferrer"
                   className="flex items-start gap-3 hover:text-yellow-400 leading-relaxed"
                 >
-                  <FaMapMarkerAlt className="mt-1" />
+                  <FaMapMarkerAlt />
                   69, Ganesham Complex, Devi Nagar, New Sanganer Road, Jaipur,
                   Rajasthan 302019
                 </a>
