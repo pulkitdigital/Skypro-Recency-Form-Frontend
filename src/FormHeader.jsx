@@ -27,16 +27,14 @@ export default function FormHeader() {
             </h4>
             <p className="leading-relaxed">
               All documents must be uploaded in{" "}
-              <span className="font-semibold">PDF format</span>, with a maximum
-              file size of{" "}
-              <span className="font-semibold">2 MB per document</span>.
-              Applicants must compress files using any available online PDF
-              compression tool before uploading. Passport-size photograph and
-              signature must be uploaded in{" "}
-              <span className="font-semibold">JPG or JPEG format only</span> and
-              must comply with the size limits specified in the form. Any file
+              <span className="font-bold">PDF format</span>, with a {" "}
+              <span className="font-bold">maximum
+              file size of 2 MB per document. </span>Applicants must compress files using any available online PDF
+              compression tool before uploading. <span className="font-bold"> Passport-size photograph and
+              signature must be uploaded in JPG or JPEG format only</span> and
+              must comply with the size limits specified in the form. <span className="font-bold"> Any file
               uploaded in an incorrect format or exceeding the prescribed size
-              limit will not be accepted.
+              limit will not be accepted.</span>
             </p>
           </div>
 
@@ -45,18 +43,9 @@ export default function FormHeader() {
               2. Document Authenticity
             </h4>
             <p className="leading-relaxed">
-              Only official documents issued by the foreign FTO will be
-              accepted. All documents must be on{" "}
-              <span className="font-semibold">
-                official letterhead and duly stamped and signed by the
-                authorised foreign FTO
-              </span>
-              . Documents without a stamp, signature, or official letterhead
-              will be treated as invalid and will lead to{" "}
-              <span className="font-semibold text-red-600">
-                cancellation of the admission slot
-              </span>
-              .
+              Only <span className="font-bold">official documents issued by the foreign FTO </span>will be accepted. All documents must be on
+                <span className="font-bold"> official letterhead and duly stamped and signed</span> by the authorised foreign FTO. <span className="font-bold">Documents without a stamp, signature, or official letterhead will be treated as invalid and will lead to
+                cancellation of the admission slot.</span>
             </p>
           </div>
         </div>
