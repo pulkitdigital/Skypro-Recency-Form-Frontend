@@ -60,11 +60,11 @@ export default function NavbarHero() {
                   About Us
                 </a>
               </li>
-              <li className="flex items-center">
+              {/* <li className="flex items-center">
                 <a href="https://admissions.skyproaviation.org/" className={isActive('/admission-form') ? 'text-[#003366]' : 'hover:text-[#003366]'}>
                   Admission Form
                 </a>
-              </li>
+              </li> */}
               <li className="flex items-center">
                 <a href="https://skyproaviation.org/business-partners/" className={isActive('/partners') ? 'text-[#003366]' : 'hover:text-[#003366]'} target="_blank">
                   Partners
