@@ -5,6 +5,9 @@ import FormHeader from "./FormHeader";
 import ThankYouPopup from "./ThankYouPopup";
 
 export default function ConversionRecencyForm() {
+  const STORAGE_KEY = "conversionFormData";
+  const STORAGE_EXPIRY = 2 * 60 * 60 * 1000; 
+
   const initialState = {
     fullName: "",
     dob: "",
@@ -77,6 +80,52 @@ export default function ConversionRecencyForm() {
   const [showThankYouPopup, setShowThankYouPopup] = useState(false);
   const formRef = useRef(null);
 
+  const saveToLocalStorage = () => {
+    try {
+      const dataToSave = {
+        timestamp: Date.now(),
+        formData: form,
+        sortieRows,
+        dgcaExamDetails,
+        disclaimerAccepted,
+        declarationAccepted,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error("❌ LocalStorage save failed:", error);
+    }
+  };
+
+  const loadFromLocalStorage = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return null;
+
+      const data = JSON.parse(saved);
+      const now = Date.now();
+
+      if (now - data.timestamp > STORAGE_EXPIRY) {
+        localStorage.removeItem(STORAGE_KEY);
+        console.log("⏰ Saved data expired (2 hours)");
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("❌ LocalStorage load failed:", error);
+      return null;
+    }
+  };
+
+  const clearLocalStorage = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      console.log("🗑️ LocalStorage cleared");
+    } catch (error) {
+      console.error("❌ LocalStorage clear failed:", error);
+    }
+  };
+
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
@@ -137,6 +186,24 @@ export default function ConversionRecencyForm() {
 
     return age;
   };
+   useEffect(() => {
+    const savedData = loadFromLocalStorage();
+    if (savedData) {
+      setForm(savedData.formData);
+      setSortieRows(savedData.sortieRows);
+      setDgcaExamDetails(savedData.dgcaExamDetails);
+      setDisclaimerAccepted(savedData.disclaimerAccepted);
+      setDeclarationAccepted(savedData.declarationAccepted);
+      console.log("✅ Form data restored from localStorage");
+    }
+  }, []);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveToLocalStorage();
+    }, 500); // Save after 500ms of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [form, sortieRows, dgcaExamDetails, disclaimerAccepted, declarationAccepted]);
 
   // Calculate total hours automatically
   useEffect(() => {
@@ -519,73 +586,7 @@ export default function ConversionRecencyForm() {
     };
   };
 
-  // const handleExamDetailChange = (exam, field, value) => {
-  //   setDgcaExamDetails((prev) =>
-  //     prev.map((detail) => {
-  //       if (detail.exam === exam) {
-  //         const updated = { ...detail, [field]: value };
-
-  //         // Calculate validity (2.5 years from resultDate)
-  //         if (field === "resultDate" && value) {
-  //           const resultDate = new Date(value);
-  //           const validityDate = new Date(resultDate);
-  //           validityDate.setFullYear(validityDate.getFullYear() + 2);
-  //           validityDate.setMonth(validityDate.getMonth() + 6);
-  //           const today = new Date();
-
-  //           if (validityDate < today) {
-  //             updated.validity = "OUT OF RECENCY";
-  //           } else {
-  //             updated.validity = formatDateForDisplay(validityDate.toISOString().split("T")[0]);
-  //           }
-  //         }
-
-  //         return updated;
-  //       }
-  //       return detail;
-  //     }),
-  //   );
-  // };
-
-  // const handleExamDetailChange = (exam, field, value) => {
-  //   setDgcaExamDetails((prev) =>
-  //     prev.map((detail) => {
-  //       if (detail.exam === exam) {
-  //         const updated = { ...detail, [field]: value };
-
-  //         // Calculate validity (2.5 years from resultDate)
-  //         if (field === "resultDate" && value) {
-  //           const resultDate = new Date(value);
-  //           const today = new Date();
-
-  //           // Calculate 2.5 years validity
-  //           const validityDate = new Date(resultDate);
-  //           validityDate.setFullYear(validityDate.getFullYear() + 2);
-  //           validityDate.setMonth(validityDate.getMonth() + 6);
-  //         validityDate.setDate(validityDate.getDate() - 1);
-
-  //           if (expiryDate < today) {
-  //             // More than 5 years old
-  //             updated.validity = "Expired";
-  //           } else if (validityDate < today && expiryDate >= today) {
-  //             // Between 2.5 and 5 years
-  //             updated.validity = "SPL Exam Required";
-  //           } else {
-  //             // Within 2.5 years - valid
-  //             updated.validity = formatDateForDisplay(
-  //               validityDate.toISOString().split("T")[0],
-  //             );
-  //           }
-  //         }
-
-  //         return updated;
-  //       }
-  //       return detail;
-  //     }),
-  //   );
-  // };
-
-  const handleExamDetailChange = (exam, field, value) => {
+    const handleExamDetailChange = (exam, field, value) => {
     setDgcaExamDetails((prev) =>
       prev.map((detail) => {
         if (detail.exam === exam) {
@@ -647,23 +648,192 @@ export default function ConversionRecencyForm() {
     }, 100);
   };
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+
+  //   if (!disclaimerAccepted || !declarationAccepted) {
+  //     setStatus("❌ Please accept both disclaimer and declaration to proceed");
+  //     return;
+  //   }
+
+  //   setLoading(true);
+  //   setStatus("");
+
+  //   // Validate required files
+  //   let requiredFiles = [
+  //     "passportPhoto",
+  //     "foreignLicense",
+  //     "studentSignature",
+  //     "finalSignature",
+  //   ];
+
+  //   if (form.last6MonthsAvailable === "Yes") {
+  //     requiredFiles.push("ca40IR");
+  //     if (form.signalReception === "Yes") {
+  //       requiredFiles.push("signalReceptionTest");
+  //     }
+  //   }
+
+  //   if (form.commercialCheckride === "C172") {
+  //     requiredFiles.push("c172CheckrideStatement");
+  //   } else if (form.c172PICOption === "flightReview") {
+  //     requiredFiles.push("c172FlightReview");
+  //   }
+
+  //   if (form.nameChangeProcessed === "Yes") {
+  //     requiredFiles.push("nameChangeCertificate");
+  //   }
+
+  //   const missingFiles = requiredFiles.filter((field) => !files[field]);
+  //   if (missingFiles.length > 0) {
+  //     setStatus(
+  //       `❌ Please upload all required files: ${missingFiles.join(", ")}`,
+  //     );
+  //     setLoading(false);
+  //     return;
+  //   }
+
+  //   const formData = new FormData();
+
+  //   // Convert all date fields to DD/MM/YYYY format before submitting
+  //   const formWithFormattedDates = { ...form };
+  //   if (form.licenseValidity)
+  //     formWithFormattedDates.licenseValidity = formatDateForDisplay(
+  //       form.licenseValidity,
+  //     );
+  //   if (form.lastFlightDate)
+  //     formWithFormattedDates.lastFlightDate = formatDateForDisplay(
+  //       form.lastFlightDate,
+  //     );
+  //   if (form.irCheckDate)
+  //     formWithFormattedDates.irCheckDate = formatDateForDisplay(
+  //       form.irCheckDate,
+  //     );
+  //   if (form.signalReceptionDate)
+  //     formWithFormattedDates.signalReceptionDate = formatDateForDisplay(
+  //       form.signalReceptionDate,
+  //     );
+  //   if (form.c172CheckrideDate)
+  //     formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(
+  //       form.c172CheckrideDate,
+  //     );
+  //   if (form.medicalValidity)
+  //     formWithFormattedDates.medicalValidity = formatDateForDisplay(
+  //       form.medicalValidity,
+  //     );
+  //   if (form.policeVerificationDate)
+  //     formWithFormattedDates.policeVerificationDate = formatDateForDisplay(
+  //       form.policeVerificationDate,
+  //     );
+
+  //   Object.keys(formWithFormattedDates).forEach((key) => {
+  //     if (key === "dgcaExams") {
+  //       formData.append(key, JSON.stringify(formWithFormattedDates[key]));
+  //     } else {
+  //       formData.append(key, formWithFormattedDates[key]);
+  //     }
+  //   });
+
+  //   // Format sortie rows dates
+  //   const formattedSortieRows = sortieRows.map((row) => ({
+  //     ...row,
+  //     dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
+  //     ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "", // Combine LDG/TO
+  //   }));
+  //   formData.append("sortieRows", JSON.stringify(formattedSortieRows));
+
+  //   // Format exam details dates
+  //   const formattedExamDetails = dgcaExamDetails.map((detail) => ({
+  //     ...detail,
+  //     resultDate: detail.resultDate
+  //       ? formatDateForDisplay(detail.resultDate)
+  //       : "",
+  //   }));
+  //   formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
+
+  //   Object.keys(files).forEach((key) => formData.append(key, files[key]));
+
+  //   // Add reCAPTCHA token
+  //   if (recaptchaToken) {
+  //     formData.append("recaptchaToken", recaptchaToken);
+  //   }
+
+  //   try {
+  //     await Promise.all([
+  //       axios.post(`${API_URL}/api/submit-conversion`, formData, {
+  //         headers: { "Content-Type": "multipart/form-data" },
+  //       }),
+  //       delay(5000),
+  //     ]);
+
+  //     // ⚠️ UPDATED: Show popup instead of just status message
+  //     setShowThankYouPopup(true);
+  //     setStatus("");
+
+  //     // Reset form
+  //     setForm(initialState);
+  //     setFiles({});
+  //     setFileErrors({});
+  //     setDisclaimerAccepted(false);
+  //     setDeclarationAccepted(false);
+  //     setRecaptchaToken(null);
+  //     setSortieRows([
+  //       {
+  //         id: Date.now(),
+  //         aircraft: "",
+  //         category: "",
+  //         typeOfFlight: "",
+  //         ldg: "",
+  //         to: "",
+  //         hours: "",
+  //         minutes: "",
+  //         dateFlown: "",
+  //         validity: "",
+  //       },
+  //     ]);
+  //     setDgcaExamDetails([]);
+  //     e.target.reset();
+
+  //     // Scroll to top
+  //     window.scrollTo({ top: 0, behavior: "smooth" });
+  //   } catch (err) {
+  //     setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
+  //     scrollToError(); // ⚠️ ADD THIS LINE - Scroll to error
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!disclaimerAccepted || !declarationAccepted) {
-      setStatus("❌ Please accept both disclaimer and declaration to proceed");
+      setStatus("❌ Please accept both disclaimer and declaration");
+      scrollToError();
       return;
     }
 
-    setLoading(true);
-    setStatus("");
+    if (!recaptchaToken) {
+      setStatus("❌ Please complete reCAPTCHA");
+      scrollToError();
+      return;
+    }
 
-    // Validate required files
     let requiredFiles = [
       "passportPhoto",
       "foreignLicense",
       "studentSignature",
       "finalSignature",
+      "pic100Statement",
+      "crossCountry300Statement",
+      "picCrossCountryStatement",
+      "instrumentTimeStatement",
+      "medicalAssessment",
+      "rtrCertificate",
+      "frtolCertificate",
+      "policeVerification",
+      "marksheet10",
+      "marksheet12",
     ];
 
     if (form.last6MonthsAvailable === "Yes") {
@@ -683,130 +853,141 @@ export default function ConversionRecencyForm() {
       requiredFiles.push("nameChangeCertificate");
     }
 
+    dgcaExamDetails.forEach((detail) => {
+      requiredFiles.push(`dgcaExam_${detail.exam}`);
+    });
+
     const missingFiles = requiredFiles.filter((field) => !files[field]);
     if (missingFiles.length > 0) {
-      setStatus(
-        `❌ Please upload all required files: ${missingFiles.join(", ")}`,
-      );
-      setLoading(false);
+      setStatus(`❌ Missing files: ${missingFiles.join(", ")}`);
+      scrollToError();
       return;
     }
 
-    const formData = new FormData();
-
-    // Convert all date fields to DD/MM/YYYY format before submitting
-    const formWithFormattedDates = { ...form };
-    if (form.licenseValidity)
-      formWithFormattedDates.licenseValidity = formatDateForDisplay(
-        form.licenseValidity,
-      );
-    if (form.lastFlightDate)
-      formWithFormattedDates.lastFlightDate = formatDateForDisplay(
-        form.lastFlightDate,
-      );
-    if (form.irCheckDate)
-      formWithFormattedDates.irCheckDate = formatDateForDisplay(
-        form.irCheckDate,
-      );
-    if (form.signalReceptionDate)
-      formWithFormattedDates.signalReceptionDate = formatDateForDisplay(
-        form.signalReceptionDate,
-      );
-    if (form.c172CheckrideDate)
-      formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(
-        form.c172CheckrideDate,
-      );
-    if (form.medicalValidity)
-      formWithFormattedDates.medicalValidity = formatDateForDisplay(
-        form.medicalValidity,
-      );
-    if (form.policeVerificationDate)
-      formWithFormattedDates.policeVerificationDate = formatDateForDisplay(
-        form.policeVerificationDate,
-      );
-
-    Object.keys(formWithFormattedDates).forEach((key) => {
-      if (key === "dgcaExams") {
-        formData.append(key, JSON.stringify(formWithFormattedDates[key]));
-      } else {
-        formData.append(key, formWithFormattedDates[key]);
-      }
-    });
-
-    // Format sortie rows dates
-    const formattedSortieRows = sortieRows.map((row) => ({
-      ...row,
-      dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
-      ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "", // Combine LDG/TO
-    }));
-    formData.append("sortieRows", JSON.stringify(formattedSortieRows));
-
-    // Format exam details dates
-    const formattedExamDetails = dgcaExamDetails.map((detail) => ({
-      ...detail,
-      resultDate: detail.resultDate
-        ? formatDateForDisplay(detail.resultDate)
-        : "",
-    }));
-    formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
-
-    Object.keys(files).forEach((key) => formData.append(key, files[key]));
-
-    // Add reCAPTCHA token
-    if (recaptchaToken) {
-      formData.append("recaptchaToken", recaptchaToken);
-    }
-
-    // try {
-    //   await Promise.all([
-    //     axios.post(`${API_URL}/api/submit-conversion`, formData, {
-    //       headers: { "Content-Type": "multipart/form-data" },
-    //     }),
-    //     delay(5000),
-    //   ]);
-
-    //   setStatus("✅ Form submitted successfully");
-    //   setForm(initialState);
-    //   setFiles({});
-    //   setFileErrors({});
-    //   setDisclaimerAccepted(false);
-    //   setDeclarationAccepted(false);
-    //   setRecaptchaToken(null);
-    //   setSortieRows([
-    //     {
-    //       id: Date.now(),
-    //       aircraft: "",
-    //       category: "",
-    //       typeOfFlight: "",
-    //       ldg: "",
-    //       to: "",
-    //       hours: "",
-    //       minutes: "",
-    //       dateFlown: "",
-    //       validity: "",
-    //     },
-    //   ]);
-    //   setDgcaExamDetails([]);
-    //   e.target.reset();
-    // } catch (err) {
-    //   setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
-    // } finally {
-    //   setLoading(false);
-    // }
+    setLoading(true);
+    setStatus("📤 Validating your submission...");
 
     try {
-      await Promise.all([
-        axios.post(`${API_URL}/api/submit-conversion`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        }),
-        delay(5000),
-      ]);
+      const formData = new FormData();
 
-      // ⚠️ UPDATED: Show popup instead of just status message
+      const formWithFormattedDates = { ...form };
+      if (form.licenseValidity)
+        formWithFormattedDates.licenseValidity = formatDateForDisplay(form.licenseValidity);
+      if (form.lastFlightDate)
+        formWithFormattedDates.lastFlightDate = formatDateForDisplay(form.lastFlightDate);
+      if (form.irCheckDate)
+        formWithFormattedDates.irCheckDate = formatDateForDisplay(form.irCheckDate);
+      if (form.signalReceptionDate)
+        formWithFormattedDates.signalReceptionDate = formatDateForDisplay(form.signalReceptionDate);
+      if (form.c172CheckrideDate)
+        formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(form.c172CheckrideDate);
+      if (form.medicalValidity)
+        formWithFormattedDates.medicalValidity = formatDateForDisplay(form.medicalValidity);
+      if (form.policeVerificationDate)
+        formWithFormattedDates.policeVerificationDate = formatDateForDisplay(form.policeVerificationDate);
+
+      Object.keys(formWithFormattedDates).forEach((key) => {
+        if (key === "dgcaExams") {
+          formData.append(key, JSON.stringify(formWithFormattedDates[key]));
+        } else {
+          formData.append(key, formWithFormattedDates[key]);
+        }
+      });
+
+      const formattedSortieRows = sortieRows.map((row) => ({
+        ...row,
+        dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
+        ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "",
+      }));
+      formData.append("sortieRows", JSON.stringify(formattedSortieRows));
+
+      const formattedExamDetails = dgcaExamDetails.map((detail) => ({
+        ...detail,
+        resultDate: detail.resultDate ? formatDateForDisplay(detail.resultDate) : "",
+      }));
+      formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
+
+      Object.keys(files).forEach((key) => formData.append(key, files[key]));
+
+      if (recaptchaToken) {
+        formData.append("recaptchaToken", recaptchaToken);
+      }
+
+      // ✅ STEP 1: Submit and wait for backend validation
+      setStatus("⏳ Submitting to server...");
+
+      const response = await axios.post(
+        `${API_URL}/api/submit-conversion`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 120000,
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || "Submission failed");
+      }
+
+      // ✅ STEP 2: Backend accepted! Show progress
+      const jobId = response.data.jobId;
+      
+      setStatus("📄 Generating your documents...");
+      await delay(2000);
+      
+      setStatus("📧 Sending confirmation emails...");
+      await delay(2000);
+      
+      setStatus("📊 Updating records...");
+      await delay(2000);
+
+      // ✅ STEP 3: Poll backend for completion
+      let jobCompleted = false;
+      let pollAttempts = 0;
+      const maxPollAttempts = 60;
+
+      while (!jobCompleted && pollAttempts < maxPollAttempts) {
+        try {
+          const statusResponse = await axios.get(`${API_URL}/api/queue-status`);
+          const currentJob = statusResponse.data.jobs?.find(j => j.id === jobId);
+          
+          if (!currentJob) {
+            jobCompleted = true;
+            break;
+          }
+          
+          if (currentJob.status === "completed") {
+            jobCompleted = true;
+            break;
+          }
+          
+          if (currentJob.status === "failed") {
+            throw new Error("Processing failed after multiple attempts");
+          }
+          
+          if (currentJob.status === "processing") {
+            setStatus("⚙️ Processing your application...");
+          } else if (currentJob.status === "retrying") {
+            setStatus("🔄 Retrying... Please wait...");
+          }
+          
+          await delay(1000);
+          pollAttempts++;
+        } catch (pollError) {
+          console.error("Poll error:", pollError);
+          await delay(1000);
+          pollAttempts++;
+        }
+      }
+
+      // ✅ STEP 4: Show success
+      setStatus("✅ Application processed successfully!");
+      await delay(2000);
+
       setShowThankYouPopup(true);
       setStatus("");
 
-      // Reset form
+      // ✅ STEP 5: Clear everything
       setForm(initialState);
       setFiles({});
       setFileErrors({});
@@ -828,18 +1009,38 @@ export default function ConversionRecencyForm() {
         },
       ]);
       setDgcaExamDetails([]);
-      e.target.reset();
 
-      // Scroll to top
+      clearLocalStorage();
+
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+
       window.scrollTo({ top: 0, behavior: "smooth" });
+
     } catch (err) {
-      setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
-      scrollToError(); // ⚠️ ADD THIS LINE - Scroll to error
+      console.error("Submission error:", err);
+
+      let errorMessage = "Submission failed. Please try again.";
+
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.request) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (err.code === "ECONNABORTED") {
+        errorMessage = "Request timeout. Your data may still be processing. Please contact support if you don't receive confirmation within 1 hour.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setStatus(`❌ ${errorMessage}`);
+      scrollToError();
+
     } finally {
       setLoading(false);
     }
   };
-
+  
   const sortieSummary = calculateSortieSummary();
 
   return (
