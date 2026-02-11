@@ -200,7 +200,7 @@ export default function NavbarHero() {
           className="absolute inset-0 bg-cover"
           style={{ backgroundImage: "url('/banner.webp')" }}
         />
-        <div className="absolute inset-0 bg-blue-900/60" />
+        <div className="absolute inset-0 bg-blue-900/70" />
 
         <div className="relative z-10 flex h-full items-center justify-center px-4">
           <div className="text-center text-white">
