@@ -1,8 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import ReCAPTCHA from "react-google-recaptcha";
+import FormHeader from "./FormHeader";
+import ThankYouPopup from "./ThankYouPopup";
 
 export default function ConversionRecencyForm() {
+  const STORAGE_KEY = "conversionFormData";
+  const STORAGE_EXPIRY = 2 * 60 * 60 * 1000; 
+
   const initialState = {
     fullName: "",
     dob: "",
@@ -72,6 +77,54 @@ export default function ConversionRecencyForm() {
   ]);
   const [dgcaExamDetails, setDgcaExamDetails] = useState([]);
   const [recaptchaToken, setRecaptchaToken] = useState(null);
+  const [showThankYouPopup, setShowThankYouPopup] = useState(false);
+  const formRef = useRef(null);
+
+  const saveToLocalStorage = () => {
+    try {
+      const dataToSave = {
+        timestamp: Date.now(),
+        formData: form,
+        sortieRows,
+        dgcaExamDetails,
+        disclaimerAccepted,
+        declarationAccepted,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error("❌ LocalStorage save failed:", error);
+    }
+  };
+
+  const loadFromLocalStorage = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return null;
+
+      const data = JSON.parse(saved);
+      const now = Date.now();
+
+      if (now - data.timestamp > STORAGE_EXPIRY) {
+        localStorage.removeItem(STORAGE_KEY);
+        console.log("⏰ Saved data expired (2 hours)");
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("❌ LocalStorage load failed:", error);
+      return null;
+    }
+  };
+
+  const clearLocalStorage = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      console.log("🗑️ LocalStorage cleared");
+    } catch (error) {
+      console.error("❌ LocalStorage clear failed:", error);
+    }
+  };
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
@@ -82,6 +135,18 @@ export default function ConversionRecencyForm() {
     const [day, month, year] = ddmmyyyy.split("/");
     return `${year}-${month}-${day}`;
   };
+
+  const formatExamName = (examKey) => {
+  const examNames = {
+    airNavigation: "Air Navigation",
+    meteorology: "Meteorology",
+    airRegulations: "Air Regulations",
+    technicalGeneral: "Technical General",
+    technicalSpecific: "Technical Specific",
+    compositePaper: "Composite Paper (Meteorology + Navigation)",
+  };
+  return examNames[examKey] || examKey;
+};
 
   // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
   const formatDateForDisplay = (yyyymmdd) => {
@@ -121,6 +186,24 @@ export default function ConversionRecencyForm() {
 
     return age;
   };
+   useEffect(() => {
+    const savedData = loadFromLocalStorage();
+    if (savedData) {
+      setForm(savedData.formData);
+      setSortieRows(savedData.sortieRows);
+      setDgcaExamDetails(savedData.dgcaExamDetails);
+      setDisclaimerAccepted(savedData.disclaimerAccepted);
+      setDeclarationAccepted(savedData.declarationAccepted);
+      console.log("✅ Form data restored from localStorage");
+    }
+  }, []);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveToLocalStorage();
+    }, 500); // Save after 500ms of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [form, sortieRows, dgcaExamDetails, disclaimerAccepted, declarationAccepted]);
 
   // Calculate total hours automatically
   useEffect(() => {
@@ -159,6 +242,7 @@ export default function ConversionRecencyForm() {
       const checkDate = new Date(form.irCheckDate);
       const validityDate = new Date(checkDate);
       validityDate.setMonth(validityDate.getMonth() + 6);
+      validityDate.setDate(validityDate.getDate() - 1);
       const today = new Date();
 
       if (validityDate < today) {
@@ -183,6 +267,7 @@ export default function ConversionRecencyForm() {
       const checkDate = new Date(form.signalReceptionDate);
       const validityDate = new Date(checkDate);
       validityDate.setMonth(validityDate.getMonth() + 6);
+      validityDate.setDate(validityDate.getDate() - 1);
       const today = new Date();
 
       if (validityDate < today) {
@@ -252,6 +337,9 @@ export default function ConversionRecencyForm() {
     }
 
     /* ---------- DEFAULT ---------- */
+    if (name === "totalSEMinutes" || name === "totalMEMinutes") {
+      if (!/^\d{1,2}$/.test(value) || parseInt(value) > 59) return;
+    }
     setForm({
       ...form,
       [name]: type === "checkbox" ? checked : value,
@@ -409,11 +497,26 @@ export default function ConversionRecencyForm() {
             }
           }
 
+          // Validate hours (2 digits)
+          if (field === "hours") {
+            if (value && !/^\d{1,2}$/.test(value)) {
+              return row;
+            }
+          }
+
+          // Validate minutes (2 digits, <=59)
+          if (field === "minutes") {
+            if (value && (!/^\d{1,2}$/.test(value) || parseInt(value) > 59)) {
+              return row;
+            }
+          }
+
           // Calculate validity (6 months from dateFlown)
           if (field === "dateFlown" && value) {
             const date = new Date(value);
             const today = new Date();
             date.setMonth(date.getMonth() + 6);
+            date.setDate(date.getDate() - 1);
 
             if (date < today) {
               updated.validity = "OUT OF RECENCY";
@@ -483,53 +586,28 @@ export default function ConversionRecencyForm() {
     };
   };
 
-  // const handleExamDetailChange = (exam, field, value) => {
-  //   setDgcaExamDetails((prev) =>
-  //     prev.map((detail) => {
-  //       if (detail.exam === exam) {
-  //         const updated = { ...detail, [field]: value };
-
-  //         // Calculate validity (2.5 years from resultDate)
-  //         if (field === "resultDate" && value) {
-  //           const resultDate = new Date(value);
-  //           const validityDate = new Date(resultDate);
-  //           validityDate.setFullYear(validityDate.getFullYear() + 2);
-  //           validityDate.setMonth(validityDate.getMonth() + 6);
-  //           const today = new Date();
-
-  //           if (validityDate < today) {
-  //             updated.validity = "OUT OF RECENCY";
-  //           } else {
-  //             updated.validity = formatDateForDisplay(validityDate.toISOString().split("T")[0]);
-  //           }
-  //         }
-
-  //         return updated;
-  //       }
-  //       return detail;
-  //     }),
-  //   );
-  // };
-
-  const handleExamDetailChange = (exam, field, value) => {
+    const handleExamDetailChange = (exam, field, value) => {
     setDgcaExamDetails((prev) =>
       prev.map((detail) => {
         if (detail.exam === exam) {
           const updated = { ...detail, [field]: value };
 
-          // Calculate validity (2.5 years from resultDate)
+          // ⚠️ FIXED: Calculate validity (2.5 years from resultDate)
           if (field === "resultDate" && value) {
             const resultDate = new Date(value);
             const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
 
             // Calculate 2.5 years validity
             const validityDate = new Date(resultDate);
             validityDate.setFullYear(validityDate.getFullYear() + 2);
             validityDate.setMonth(validityDate.getMonth() + 6);
+            validityDate.setDate(validityDate.getDate() - 1);
 
             // Calculate 5 years expiry
             const expiryDate = new Date(resultDate);
             expiryDate.setFullYear(expiryDate.getFullYear() + 5);
+            expiryDate.setDate(expiryDate.getDate() - 1);
 
             if (expiryDate < today) {
               // More than 5 years old
@@ -554,118 +632,362 @@ export default function ConversionRecencyForm() {
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  const scrollToError = () => {
+    setTimeout(() => {
+      const errorElement = document.querySelector(
+        ".border-red-400, .text-red-600, .bg-red-50",
+      );
+      if (errorElement) {
+        const section = errorElement.closest("section");
+        if (section) {
+          section.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }, 100);
+  };
+
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+
+  //   if (!disclaimerAccepted || !declarationAccepted) {
+  //     setStatus("❌ Please accept both disclaimer and declaration to proceed");
+  //     return;
+  //   }
+
+  //   setLoading(true);
+  //   setStatus("");
+
+  //   // Validate required files
+  //   let requiredFiles = [
+  //     "passportPhoto",
+  //     "foreignLicense",
+  //     "studentSignature",
+  //     "finalSignature",
+  //   ];
+
+  //   if (form.last6MonthsAvailable === "Yes") {
+  //     requiredFiles.push("ca40IR");
+  //     if (form.signalReception === "Yes") {
+  //       requiredFiles.push("signalReceptionTest");
+  //     }
+  //   }
+
+  //   if (form.commercialCheckride === "C172") {
+  //     requiredFiles.push("c172CheckrideStatement");
+  //   } else if (form.c172PICOption === "flightReview") {
+  //     requiredFiles.push("c172FlightReview");
+  //   }
+
+  //   if (form.nameChangeProcessed === "Yes") {
+  //     requiredFiles.push("nameChangeCertificate");
+  //   }
+
+  //   const missingFiles = requiredFiles.filter((field) => !files[field]);
+  //   if (missingFiles.length > 0) {
+  //     setStatus(
+  //       `❌ Please upload all required files: ${missingFiles.join(", ")}`,
+  //     );
+  //     setLoading(false);
+  //     return;
+  //   }
+
+  //   const formData = new FormData();
+
+  //   // Convert all date fields to DD/MM/YYYY format before submitting
+  //   const formWithFormattedDates = { ...form };
+  //   if (form.licenseValidity)
+  //     formWithFormattedDates.licenseValidity = formatDateForDisplay(
+  //       form.licenseValidity,
+  //     );
+  //   if (form.lastFlightDate)
+  //     formWithFormattedDates.lastFlightDate = formatDateForDisplay(
+  //       form.lastFlightDate,
+  //     );
+  //   if (form.irCheckDate)
+  //     formWithFormattedDates.irCheckDate = formatDateForDisplay(
+  //       form.irCheckDate,
+  //     );
+  //   if (form.signalReceptionDate)
+  //     formWithFormattedDates.signalReceptionDate = formatDateForDisplay(
+  //       form.signalReceptionDate,
+  //     );
+  //   if (form.c172CheckrideDate)
+  //     formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(
+  //       form.c172CheckrideDate,
+  //     );
+  //   if (form.medicalValidity)
+  //     formWithFormattedDates.medicalValidity = formatDateForDisplay(
+  //       form.medicalValidity,
+  //     );
+  //   if (form.policeVerificationDate)
+  //     formWithFormattedDates.policeVerificationDate = formatDateForDisplay(
+  //       form.policeVerificationDate,
+  //     );
+
+  //   Object.keys(formWithFormattedDates).forEach((key) => {
+  //     if (key === "dgcaExams") {
+  //       formData.append(key, JSON.stringify(formWithFormattedDates[key]));
+  //     } else {
+  //       formData.append(key, formWithFormattedDates[key]);
+  //     }
+  //   });
+
+  //   // Format sortie rows dates
+  //   const formattedSortieRows = sortieRows.map((row) => ({
+  //     ...row,
+  //     dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
+  //     ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "", // Combine LDG/TO
+  //   }));
+  //   formData.append("sortieRows", JSON.stringify(formattedSortieRows));
+
+  //   // Format exam details dates
+  //   const formattedExamDetails = dgcaExamDetails.map((detail) => ({
+  //     ...detail,
+  //     resultDate: detail.resultDate
+  //       ? formatDateForDisplay(detail.resultDate)
+  //       : "",
+  //   }));
+  //   formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
+
+  //   Object.keys(files).forEach((key) => formData.append(key, files[key]));
+
+  //   // Add reCAPTCHA token
+  //   if (recaptchaToken) {
+  //     formData.append("recaptchaToken", recaptchaToken);
+  //   }
+
+  //   try {
+  //     await Promise.all([
+  //       axios.post(`${API_URL}/api/submit-conversion`, formData, {
+  //         headers: { "Content-Type": "multipart/form-data" },
+  //       }),
+  //       delay(5000),
+  //     ]);
+
+  //     // ⚠️ UPDATED: Show popup instead of just status message
+  //     setShowThankYouPopup(true);
+  //     setStatus("");
+
+  //     // Reset form
+  //     setForm(initialState);
+  //     setFiles({});
+  //     setFileErrors({});
+  //     setDisclaimerAccepted(false);
+  //     setDeclarationAccepted(false);
+  //     setRecaptchaToken(null);
+  //     setSortieRows([
+  //       {
+  //         id: Date.now(),
+  //         aircraft: "",
+  //         category: "",
+  //         typeOfFlight: "",
+  //         ldg: "",
+  //         to: "",
+  //         hours: "",
+  //         minutes: "",
+  //         dateFlown: "",
+  //         validity: "",
+  //       },
+  //     ]);
+  //     setDgcaExamDetails([]);
+  //     e.target.reset();
+
+  //     // Scroll to top
+  //     window.scrollTo({ top: 0, behavior: "smooth" });
+  //   } catch (err) {
+  //     setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
+  //     scrollToError(); // ⚠️ ADD THIS LINE - Scroll to error
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!disclaimerAccepted || !declarationAccepted) {
-      setStatus("❌ Please accept both disclaimer and declaration to proceed");
+      setStatus("❌ Please accept both disclaimer and declaration");
+      scrollToError();
       return;
     }
 
-    setLoading(true);
-    setStatus("");
+    if (!recaptchaToken) {
+      setStatus("❌ Please complete reCAPTCHA");
+      scrollToError();
+      return;
+    }
 
-    // Validate required files
-    let requiredFiles = ['passportPhoto', 'foreignLicense', 'studentSignature', 'finalSignature'];
-    
+    let requiredFiles = [
+      "passportPhoto",
+      "foreignLicense",
+      "studentSignature",
+      "finalSignature",
+      "pic100Statement",
+      "crossCountry300Statement",
+      "picCrossCountryStatement",
+      "instrumentTimeStatement",
+      "medicalAssessment",
+      "rtrCertificate",
+      "frtolCertificate",
+      "policeVerification",
+      "marksheet10",
+      "marksheet12",
+    ];
+
     if (form.last6MonthsAvailable === "Yes") {
-      requiredFiles.push('ca40IR');
+      requiredFiles.push("ca40IR");
       if (form.signalReception === "Yes") {
-        requiredFiles.push('signalReceptionTest');
+        requiredFiles.push("signalReceptionTest");
       }
     }
 
     if (form.commercialCheckride === "C172") {
-      requiredFiles.push('c172CheckrideStatement');
+      requiredFiles.push("c172CheckrideStatement");
     } else if (form.c172PICOption === "flightReview") {
-      requiredFiles.push('c172FlightReview');
+      requiredFiles.push("c172FlightReview");
     }
 
     if (form.nameChangeProcessed === "Yes") {
-      requiredFiles.push('nameChangeCertificate');
+      requiredFiles.push("nameChangeCertificate");
     }
 
-    const missingFiles = requiredFiles.filter(field => !files[field]);
+    dgcaExamDetails.forEach((detail) => {
+      requiredFiles.push(`dgcaExam_${detail.exam}`);
+    });
+
+    const missingFiles = requiredFiles.filter((field) => !files[field]);
     if (missingFiles.length > 0) {
-      setStatus(`❌ Please upload all required files: ${missingFiles.join(', ')}`);
-      setLoading(false);
+      setStatus(`❌ Missing files: ${missingFiles.join(", ")}`);
+      scrollToError();
       return;
     }
 
-    const formData = new FormData();
-
-    // Convert all date fields to DD/MM/YYYY format before submitting
-    const formWithFormattedDates = { ...form };
-    if (form.licenseValidity)
-      formWithFormattedDates.licenseValidity = formatDateForDisplay(
-        form.licenseValidity,
-      );
-    if (form.lastFlightDate)
-      formWithFormattedDates.lastFlightDate = formatDateForDisplay(
-        form.lastFlightDate,
-      );
-    if (form.irCheckDate)
-      formWithFormattedDates.irCheckDate = formatDateForDisplay(
-        form.irCheckDate,
-      );
-    if (form.signalReceptionDate)
-      formWithFormattedDates.signalReceptionDate = formatDateForDisplay(
-        form.signalReceptionDate,
-      );
-    if (form.c172CheckrideDate)
-      formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(
-        form.c172CheckrideDate,
-      );
-    if (form.medicalValidity)
-      formWithFormattedDates.medicalValidity = formatDateForDisplay(
-        form.medicalValidity,
-      );
-    if (form.policeVerificationDate)
-      formWithFormattedDates.policeVerificationDate = formatDateForDisplay(
-        form.policeVerificationDate,
-      );
-
-    Object.keys(formWithFormattedDates).forEach((key) => {
-      if (key === "dgcaExams") {
-        formData.append(key, JSON.stringify(formWithFormattedDates[key]));
-      } else {
-        formData.append(key, formWithFormattedDates[key]);
-      }
-    });
-
-    // Format sortie rows dates
-    const formattedSortieRows = sortieRows.map((row) => ({
-      ...row,
-      dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
-      ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "", // Combine LDG/TO
-    }));
-    formData.append("sortieRows", JSON.stringify(formattedSortieRows));
-
-    // Format exam details dates
-    const formattedExamDetails = dgcaExamDetails.map((detail) => ({
-      ...detail,
-      resultDate: detail.resultDate
-        ? formatDateForDisplay(detail.resultDate)
-        : "",
-    }));
-    formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
-
-    Object.keys(files).forEach((key) => formData.append(key, files[key]));
-
-    // Add reCAPTCHA token
-    if (recaptchaToken) {
-      formData.append("recaptchaToken", recaptchaToken);
-    }
+    setLoading(true);
+    setStatus("📤 Validating your submission...");
 
     try {
-      await Promise.all([
-        axios.post(`${API_URL}/api/submit-conversion`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        }),
-        delay(5000),
-      ]);
+      const formData = new FormData();
 
-      setStatus("✅ Form submitted successfully");
+      const formWithFormattedDates = { ...form };
+      if (form.licenseValidity)
+        formWithFormattedDates.licenseValidity = formatDateForDisplay(form.licenseValidity);
+      if (form.lastFlightDate)
+        formWithFormattedDates.lastFlightDate = formatDateForDisplay(form.lastFlightDate);
+      if (form.irCheckDate)
+        formWithFormattedDates.irCheckDate = formatDateForDisplay(form.irCheckDate);
+      if (form.signalReceptionDate)
+        formWithFormattedDates.signalReceptionDate = formatDateForDisplay(form.signalReceptionDate);
+      if (form.c172CheckrideDate)
+        formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(form.c172CheckrideDate);
+      if (form.medicalValidity)
+        formWithFormattedDates.medicalValidity = formatDateForDisplay(form.medicalValidity);
+      if (form.policeVerificationDate)
+        formWithFormattedDates.policeVerificationDate = formatDateForDisplay(form.policeVerificationDate);
+
+      Object.keys(formWithFormattedDates).forEach((key) => {
+        if (key === "dgcaExams") {
+          formData.append(key, JSON.stringify(formWithFormattedDates[key]));
+        } else {
+          formData.append(key, formWithFormattedDates[key]);
+        }
+      });
+
+      const formattedSortieRows = sortieRows.map((row) => ({
+        ...row,
+        dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
+        ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "",
+      }));
+      formData.append("sortieRows", JSON.stringify(formattedSortieRows));
+
+      const formattedExamDetails = dgcaExamDetails.map((detail) => ({
+        ...detail,
+        resultDate: detail.resultDate ? formatDateForDisplay(detail.resultDate) : "",
+      }));
+      formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
+
+      Object.keys(files).forEach((key) => formData.append(key, files[key]));
+
+      if (recaptchaToken) {
+        formData.append("recaptchaToken", recaptchaToken);
+      }
+
+      // ✅ STEP 1: Submit and wait for backend validation
+      setStatus("⏳ Submitting to server...");
+
+      const response = await axios.post(
+        `${API_URL}/api/submit-conversion`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 120000,
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || "Submission failed");
+      }
+
+      // ✅ STEP 2: Backend accepted! Show progress
+      const jobId = response.data.jobId;
+      
+      setStatus("📄 Generating your documents...");
+      await delay(2000);
+      
+      setStatus("📧 Sending confirmation emails...");
+      await delay(2000);
+      
+      setStatus("📊 Updating records...");
+      await delay(2000);
+
+      // ✅ STEP 3: Poll backend for completion
+      let jobCompleted = false;
+      let pollAttempts = 0;
+      const maxPollAttempts = 60;
+
+      while (!jobCompleted && pollAttempts < maxPollAttempts) {
+        try {
+          const statusResponse = await axios.get(`${API_URL}/api/queue-status`);
+          const currentJob = statusResponse.data.jobs?.find(j => j.id === jobId);
+          
+          if (!currentJob) {
+            jobCompleted = true;
+            break;
+          }
+          
+          if (currentJob.status === "completed") {
+            jobCompleted = true;
+            break;
+          }
+          
+          if (currentJob.status === "failed") {
+            throw new Error("Processing failed after multiple attempts");
+          }
+          
+          if (currentJob.status === "processing") {
+            setStatus("⚙️ Processing your application...");
+          } else if (currentJob.status === "retrying") {
+            setStatus("🔄 Retrying... Please wait...");
+          }
+          
+          await delay(1000);
+          pollAttempts++;
+        } catch (pollError) {
+          console.error("Poll error:", pollError);
+          await delay(1000);
+          pollAttempts++;
+        }
+      }
+
+      // ✅ STEP 4: Show success
+      setStatus("✅ Application processed successfully!");
+      await delay(2000);
+
+      setShowThankYouPopup(true);
+      setStatus("");
+
+      // ✅ STEP 5: Clear everything
       setForm(initialState);
       setFiles({});
       setFileErrors({});
@@ -687,32 +1009,47 @@ export default function ConversionRecencyForm() {
         },
       ]);
       setDgcaExamDetails([]);
-      e.target.reset();
+
+      clearLocalStorage();
+
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
     } catch (err) {
-      setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
+      console.error("Submission error:", err);
+
+      let errorMessage = "Submission failed. Please try again.";
+
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.request) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (err.code === "ECONNABORTED") {
+        errorMessage = "Request timeout. Your data may still be processing. Please contact support if you don't receive confirmation within 1 hour.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setStatus(`❌ ${errorMessage}`);
+      scrollToError();
+
     } finally {
       setLoading(false);
     }
   };
-
+  
   const sortieSummary = calculateSortieSummary();
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h2
-            className="text-3xl sm:text-5xl font-bold mb-2"
-            style={{ color: "black" }}
-          >
-            Conversion and Recency Admission Form
-          </h2>
-          <p className="text-xl font-bold" style={{ color: "#f4b221" }}>
-            SkyPro Aviation Academy
-          </p>
-        </div>
+        <FormHeader />
 
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="bg-white shadow-2xl rounded-3xl p-8 sm:p-12 border border-gray-200 lg:w-[90%] mx-auto"
         >
@@ -922,11 +1259,6 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
-                {/* {form.licenseValidity && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Format: {formatDateForDisplay(form.licenseValidity)}
-                  </p>
-                )} */}
               </div>
 
               <div className="md:col-span-2">
@@ -1104,11 +1436,6 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
-                {/* {form.lastFlightDate && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Format: {formatDateForDisplay(form.lastFlightDate)}
-                  </p>
-                )} */}
               </div>
             </div>
           </section>
@@ -1207,6 +1534,7 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
+                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1220,6 +1548,7 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
+                                required
                               >
                                 <option value="">Select</option>
                                 <option value="SE">SE</option>
@@ -1237,6 +1566,7 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
+                                required
                               >
                                 <option value="">Select</option>
                                 <option value="Dual">Dual</option>
@@ -1284,7 +1614,7 @@ export default function ConversionRecencyForm() {
                               <input
                                 type="number"
                                 min="0"
-                                max="999"
+                                max="99"
                                 value={row.hours}
                                 onChange={(e) =>
                                   handleSortieChange(
@@ -1295,6 +1625,7 @@ export default function ConversionRecencyForm() {
                                 }
                                 placeholder="HH"
                                 className="w-full px-2 py-1 border border-gray-300 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1312,6 +1643,7 @@ export default function ConversionRecencyForm() {
                                 }
                                 placeholder="MM"
                                 className="w-full px-2 py-1 border border-gray-300 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1326,6 +1658,7 @@ export default function ConversionRecencyForm() {
                                   )
                                 }
                                 className="w-full px-2 py-1 border border-gray-300 rounded"
+                                required
                               />
                             </td>
                             <td className="border border-gray-300 px-2 py-2">
@@ -1463,11 +1796,6 @@ export default function ConversionRecencyForm() {
                         required
                         onChange={handleChange}
                       />
-                      {/* {form.irCheckDate && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Format: {formatDateForDisplay(form.irCheckDate)}
-                        </p>
-                      )} */}
                     </div>
                     {/* <div>
                       <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1589,12 +1917,6 @@ export default function ConversionRecencyForm() {
                           required
                           onChange={handleChange}
                         />
-                        {/* {form.signalReceptionDate && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            Format:{" "}
-                            {formatDateForDisplay(form.signalReceptionDate)}
-                          </p>
-                        )} */}
                       </div>
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1636,11 +1958,12 @@ export default function ConversionRecencyForm() {
                             {fileErrors.signalReceptionTest}
                           </p>
                         )}
-                        {files.signalReceptionTest && !fileErrors.signalReceptionTest && (
-                          <p className="text-green-600 text-sm mt-1">
-                            ✓ {files.signalReceptionTest.name}
-                          </p>
-                        )}
+                        {files.signalReceptionTest &&
+                          !fileErrors.signalReceptionTest && (
+                            <p className="text-green-600 text-sm mt-1">
+                              ✓ {files.signalReceptionTest.name}
+                            </p>
+                          )}
                       </div>
                     </div>
                   )}
@@ -1702,11 +2025,6 @@ export default function ConversionRecencyForm() {
                     required
                     onChange={handleChange}
                   />
-                  {/* {form.c172CheckrideDate && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Format: {formatDateForDisplay(form.c172CheckrideDate)}
-                    </p>
-                  )} */}
                 </div>
                 <div>
                   <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1733,11 +2051,12 @@ export default function ConversionRecencyForm() {
                       {fileErrors.c172CheckrideStatement}
                     </p>
                   )}
-                  {files.c172CheckrideStatement && !fileErrors.c172CheckrideStatement && (
-                    <p className="text-green-600 text-sm mt-1">
-                      ✓ {files.c172CheckrideStatement.name}
-                    </p>
-                  )}
+                  {files.c172CheckrideStatement &&
+                    !fileErrors.c172CheckrideStatement && (
+                      <p className="text-green-600 text-sm mt-1">
+                        ✓ {files.c172CheckrideStatement.name}
+                      </p>
+                    )}
                 </div>
               </div>
             )}
@@ -1907,11 +2226,12 @@ export default function ConversionRecencyForm() {
                     {fileErrors.crossCountry300Statement}
                   </p>
                 )}
-                {files.crossCountry300Statement && !fileErrors.crossCountry300Statement && (
-                  <p className="text-green-600 text-sm mt-1">
-                    ✓ {files.crossCountry300Statement.name}
-                  </p>
-                )}
+                {files.crossCountry300Statement &&
+                  !fileErrors.crossCountry300Statement && (
+                    <p className="text-green-600 text-sm mt-1">
+                      ✓ {files.crossCountry300Statement.name}
+                    </p>
+                  )}
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1953,11 +2273,12 @@ export default function ConversionRecencyForm() {
                     {fileErrors.picCrossCountryStatement}
                   </p>
                 )}
-                {files.picCrossCountryStatement && !fileErrors.picCrossCountryStatement && (
-                  <p className="text-green-600 text-sm mt-1">
-                    ✓ {files.picCrossCountryStatement.name}
-                  </p>
-                )}
+                {files.picCrossCountryStatement &&
+                  !fileErrors.picCrossCountryStatement && (
+                    <p className="text-green-600 text-sm mt-1">
+                      ✓ {files.picCrossCountryStatement.name}
+                    </p>
+                  )}
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -1998,11 +2319,12 @@ export default function ConversionRecencyForm() {
                     {fileErrors.instrumentTimeStatement}
                   </p>
                 )}
-                {files.instrumentTimeStatement && !fileErrors.instrumentTimeStatement && (
-                  <p className="text-green-600 text-sm mt-1">
-                    ✓ {files.instrumentTimeStatement.name}
-                  </p>
-                )}
+                {files.instrumentTimeStatement &&
+                  !fileErrors.instrumentTimeStatement && (
+                    <p className="text-green-600 text-sm mt-1">
+                      ✓ {files.instrumentTimeStatement.name}
+                    </p>
+                  )}
               </div>
             </div>
           </section>
@@ -2028,11 +2350,6 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
-                {/* {form.medicalValidity && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Format: {formatDateForDisplay(form.medicalValidity)}
-                  </p>
-                )} */}
               </div>
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -2106,8 +2423,11 @@ export default function ConversionRecencyForm() {
                     key={detail.exam}
                     className="mb-6 p-4 border border-gray-300 rounded-xl"
                   >
-                    <h6 className="font-bold mb-3 capitalize">
+                    {/* <h6 className="font-bold mb-3 capitalize">
                       {detail.exam.replace(/([A-Z])/g, " $1").trim()}
+                    </h6> */}
+                    <h6 className="font-bold mb-3">
+                      {formatExamName(detail.exam)}
                     </h6>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -2128,11 +2448,6 @@ export default function ConversionRecencyForm() {
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                           required
                         />
-                        {/* {detail.resultDate && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            Format: {formatDateForDisplay(detail.resultDate)}
-                          </p>
-                        )} */}
                       </div>
                       <div>
                         <label className="block font-semibold mb-2">
@@ -2173,11 +2488,12 @@ export default function ConversionRecencyForm() {
                             {fileErrors[`dgcaExam_${detail.exam}`]}
                           </p>
                         )}
-                        {files[`dgcaExam_${detail.exam}`] && !fileErrors[`dgcaExam_${detail.exam}`] && (
-                          <p className="text-green-600 text-sm mt-1">
-                            ✓ {files[`dgcaExam_${detail.exam}`].name}
-                          </p>
-                        )}
+                        {files[`dgcaExam_${detail.exam}`] &&
+                          !fileErrors[`dgcaExam_${detail.exam}`] && (
+                            <p className="text-green-600 text-sm mt-1">
+                              ✓ {files[`dgcaExam_${detail.exam}`].name}
+                            </p>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -2344,11 +2660,6 @@ export default function ConversionRecencyForm() {
                   required
                   onChange={handleChange}
                 />
-                {/* {form.policeVerificationDate && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Format: {formatDateForDisplay(form.policeVerificationDate)}
-                  </p>
-                )} */}
               </div>
 
               {/* Upload Police Verification */}
@@ -2496,11 +2807,12 @@ export default function ConversionRecencyForm() {
                     {fileErrors.nameChangeCertificate}
                   </p>
                 )}
-                {files.nameChangeCertificate && !fileErrors.nameChangeCertificate && (
-                  <p className="text-green-600 text-sm mt-1">
-                    ✓ {files.nameChangeCertificate.name}
-                  </p>
-                )}
+                {files.nameChangeCertificate &&
+                  !fileErrors.nameChangeCertificate && (
+                    <p className="text-green-600 text-sm mt-1">
+                      ✓ {files.nameChangeCertificate.name}
+                    </p>
+                  )}
               </div>
             )}
           </section>
@@ -2525,28 +2837,27 @@ export default function ConversionRecencyForm() {
                 <span className="text-gray-800 font-medium mb-4">
                   <p className="mb-2">
                     I understand and acknowledge that SkyPro Aviation's partner
-                  Flying Training Organisations (FTOs) are DGCA-approved and
-                  operate in accordance with DGCA training and safety standards.
-                  I further understand that flying training involves inherent
-                  risks. Having fully understood these risks, I voluntarily
-                  undertake sole responsibility for my safety and for any
-                  incident or accident that may occur during flight training for
-                  license conversion or recency, and I agree that SkyPro
-                  Aviation shall not be held responsible or liable in any
-                  manner.
+                    Flying Training Organisations (FTOs) are DGCA-approved and
+                    operate in accordance with DGCA training and safety
+                    standards. I further understand that flying training
+                    involves inherent risks. Having fully understood these
+                    risks, I voluntarily undertake sole responsibility for my
+                    safety and for any incident or accident that may occur
+                    during flight training for license conversion or recency,
+                    and I agree that SkyPro Aviation shall not be held
+                    responsible or liable in any manner.
                   </p>
                   <p>
-                    I further understand and agree that if I fail to
-                  perform satisfactorily during any checks, fail to obtain solo
-                  release in the first attempt, or if there is any delay arising
-                  due to my performance, skill level, preparedness, or
-                  competency, then the 7-day commitment and 15-day completion
-                  guarantee provided by SkyPro Aviation shall no longer be
-                  applicable. Any additional training, time, or costs resulting
-                  from such performance-related delays shall be my sole
-                  responsibility.<span className="text-red-500">*</span>
+                    I further understand and agree that if I fail to perform
+                    satisfactorily during any checks, fail to obtain solo
+                    release in the first attempt, or if there is any delay
+                    arising due to my performance, skill level, preparedness, or
+                    competency, then the 7-day commitment and 15-day completion
+                    guarantee provided by SkyPro Aviation shall no longer be
+                    applicable. Any additional training, time, or costs
+                    resulting from such performance-related delays shall be my
+                    sole responsibility.<span className="text-red-500">*</span>
                   </p>
-                  
                 </span>
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2729,13 +3040,22 @@ export default function ConversionRecencyForm() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !disclaimerAccepted || !declarationAccepted || !recaptchaToken}
+            disabled={
+              loading ||
+              !disclaimerAccepted ||
+              !declarationAccepted ||
+              !recaptchaToken
+            }
             className="w-full bg-[#003366] hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-2xl text-xl shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500"
           >
             {loading ? "Submitting..." : "Submit Application"}
           </button>
         </form>
       </div>
+      <ThankYouPopup 
+        isOpen={showThankYouPopup} 
+        onClose={() => setShowThankYouPopup(false)} 
+      />
     </div>
   );
 }

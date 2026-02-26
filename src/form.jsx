@@ -6,7 +6,7 @@ import ThankYouPopup from "./ThankYouPopup";
 
 export default function ConversionRecencyForm() {
   const STORAGE_KEY = "conversionFormData";
-  const STORAGE_EXPIRY = 2 * 60 * 60 * 1000; 
+  const STORAGE_EXPIRY = 2 * 60 * 60 * 1000;
 
   const initialState = {
     fullName: "",
@@ -26,6 +26,7 @@ export default function ConversionRecencyForm() {
     aircraftTypes: "",
     lastFlightDate: "",
     last6MonthsAvailable: "",
+    irCheckGiven: "",
     irCheckAircraft: "",
     irCheckDate: "",
     irCheckValidity: "",
@@ -35,8 +36,16 @@ export default function ConversionRecencyForm() {
     commercialCheckride: "",
     c172CheckrideDate: "",
     c172PICOption: "",
-    totalPICExperience: "",
-    totalPICCrossCountry: "",
+    // PIC Experience — HH:MM
+    totalPICExperienceHours: "",
+    totalPICExperienceMinutes: "",
+    totalPICCrossCountryHours: "",
+    totalPICCrossCountryMinutes: "",
+    // Instrument Time — split
+    instrumentActualHours: "",
+    instrumentActualMinutes: "",
+    instrumentSimulatorHours: "",
+    instrumentSimulatorMinutes: "",
     totalInstrumentTime: "",
     medicalValidity: "",
     dgcaExams: {
@@ -50,6 +59,10 @@ export default function ConversionRecencyForm() {
     rtrValidity: "",
     frtolUploaded: false,
     policeVerificationDate: "",
+    // SPL
+    hasSPL: "",
+    splIssueDate: "",
+    splValidity: "",
     nameChangeProcessed: "",
     hearAboutUs: "",
   };
@@ -137,16 +150,16 @@ export default function ConversionRecencyForm() {
   };
 
   const formatExamName = (examKey) => {
-  const examNames = {
-    airNavigation: "Air Navigation",
-    meteorology: "Meteorology",
-    airRegulations: "Air Regulations",
-    technicalGeneral: "Technical General",
-    technicalSpecific: "Technical Specific",
-    compositePaper: "Composite Paper (Meteorology + Navigation)",
+    const examNames = {
+      airNavigation: "Air Navigation",
+      meteorology: "Meteorology",
+      airRegulations: "Air Regulations",
+      technicalGeneral: "Technical General",
+      technicalSpecific: "Technical Specific",
+      compositePaper: "Composite Paper (Meteorology + Navigation)",
+    };
+    return examNames[examKey] || examKey;
   };
-  return examNames[examKey] || examKey;
-};
 
   // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
   const formatDateForDisplay = (yyyymmdd) => {
@@ -186,7 +199,7 @@ export default function ConversionRecencyForm() {
 
     return age;
   };
-   useEffect(() => {
+  useEffect(() => {
     const savedData = loadFromLocalStorage();
     if (savedData) {
       setForm(savedData.formData);
@@ -203,7 +216,13 @@ export default function ConversionRecencyForm() {
     }, 500); // Save after 500ms of inactivity
 
     return () => clearTimeout(timeoutId);
-  }, [form, sortieRows, dgcaExamDetails, disclaimerAccepted, declarationAccepted]);
+  }, [
+    form,
+    sortieRows,
+    dgcaExamDetails,
+    disclaimerAccepted,
+    declarationAccepted,
+  ]);
 
   // Calculate total hours automatically
   useEffect(() => {
@@ -226,6 +245,24 @@ export default function ConversionRecencyForm() {
     form.totalSEMinutes,
     form.totalMEHours,
     form.totalMEMinutes,
+  ]);
+  // Auto-calc Instrument Time total
+  useEffect(() => {
+    const actualH = parseInt(form.instrumentActualHours) || 0;
+    const actualM = parseInt(form.instrumentActualMinutes) || 0;
+    const simH = parseInt(form.instrumentSimulatorHours) || 0;
+    const simM = parseInt(form.instrumentSimulatorMinutes) || 0;
+    const total = timeToDecimal(actualH, actualM) + timeToDecimal(simH, simM);
+    const { hours, minutes } = decimalToTime(total);
+    setForm((prev) => ({
+      ...prev,
+      totalInstrumentTime: `${hours}:${minutes.toString().padStart(2, "0")}`,
+    }));
+  }, [
+    form.instrumentActualHours,
+    form.instrumentActualMinutes,
+    form.instrumentSimulatorHours,
+    form.instrumentSimulatorMinutes,
   ]);
 
   // Calculate age when DOB changes
@@ -301,7 +338,7 @@ export default function ConversionRecencyForm() {
       if (checked) {
         setDgcaExamDetails((prev) => [
           ...prev,
-          { exam: examName, resultDate: "", validity: "" },
+          { exam: examName, resultDate: "", validity: "", aircraft: "" },
         ]);
       } else {
         setDgcaExamDetails((prev) => prev.filter((d) => d.exam !== examName));
@@ -325,19 +362,32 @@ export default function ConversionRecencyForm() {
     }
 
     /* ---------- PIC HOURS (3 digits only) ---------- */
-    if (
-      name === "totalPICExperience" ||
-      name === "totalPICCrossCountry" ||
-      name === "totalInstrumentTime"
-    ) {
-      if (!/^\d{1,3}$/.test(value)) return;
+    // if (
+    //   name === "totalPICExperience" ||
+    //   name === "totalPICCrossCountry" ||
+    //   name === "totalInstrumentTime"
+    // ) {
+    //   if (!/^\d{1,3}$/.test(value)) return;
 
-      setForm({ ...form, [name]: value });
-      return;
-    }
+    //   setForm({ ...form, [name]: value });
+    //   return;
+    // }
 
     /* ---------- DEFAULT ---------- */
-    if (name === "totalSEMinutes" || name === "totalMEMinutes") {
+    // if (name === "totalSEMinutes" || name === "totalMEMinutes") {
+    //   if (!/^\d{1,2}$/.test(value) || parseInt(value) > 59) return;
+    // }
+
+    /* ---------- MINUTES VALIDATION for all HH:MM pairs ---------- */
+    const minuteFields = [
+      "totalSEMinutes",
+      "totalMEMinutes",
+      "totalPICExperienceMinutes",
+      "totalPICCrossCountryMinutes",
+      "instrumentActualMinutes",
+      "instrumentSimulatorMinutes",
+    ];
+    if (minuteFields.includes(name)) {
       if (!/^\d{1,2}$/.test(value) || parseInt(value) > 59) return;
     }
     setForm({
@@ -534,28 +584,6 @@ export default function ConversionRecencyForm() {
     );
   };
 
-  // const calculateSortieSummary = () => {
-  //   let totalDayPIC = 0;
-  //   let totalNightPIC = 0;
-  //   let totalIF = 0;
-
-  //   sortieRows.forEach((row) => {
-  //     const hours = parseInt(row.hours) || 0;
-  //     const minutes = parseInt(row.minutes) || 0;
-  //     const totalTime = timeToDecimal(hours, minutes);
-
-  //     if (row.typeOfFlight === "Day PIC") totalDayPIC += totalTime;
-  //     if (row.typeOfFlight === "Night PIC") totalNightPIC += totalTime;
-  //     if (row.typeOfFlight === "IF") totalIF += totalTime;
-  //   });
-
-  //   return {
-  //     totalDayPIC: decimalToTime(totalDayPIC),
-  //     totalNightPIC: decimalToTime(totalNightPIC),
-  //     totalIF: decimalToTime(totalIF),
-  //   };
-  // };
-
   const calculateSortieSummary = () => {
     let totalDayPIC = 0;
     let totalNightPIC = 0;
@@ -586,37 +614,31 @@ export default function ConversionRecencyForm() {
     };
   };
 
-    const handleExamDetailChange = (exam, field, value) => {
+  const handleExamDetailChange = (exam, field, value) => {
     setDgcaExamDetails((prev) =>
       prev.map((detail) => {
         if (detail.exam === exam) {
-          const updated = { ...detail, [field]: value };
+          const updated = { ...detail, [field]: value }; // aircraft bhi handle hoga automatically
 
-          // ⚠️ FIXED: Calculate validity (2.5 years from resultDate)
           if (field === "resultDate" && value) {
             const resultDate = new Date(value);
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
+            today.setHours(0, 0, 0, 0);
 
-            // Calculate 2.5 years validity
             const validityDate = new Date(resultDate);
             validityDate.setFullYear(validityDate.getFullYear() + 2);
             validityDate.setMonth(validityDate.getMonth() + 6);
             validityDate.setDate(validityDate.getDate() - 1);
 
-            // Calculate 5 years expiry
             const expiryDate = new Date(resultDate);
             expiryDate.setFullYear(expiryDate.getFullYear() + 5);
             expiryDate.setDate(expiryDate.getDate() - 1);
 
             if (expiryDate < today) {
-              // More than 5 years old
               updated.validity = "Expired";
             } else if (validityDate < today && expiryDate >= today) {
-              // Between 2.5 and 5 years
               updated.validity = "SPL Exam Required";
             } else {
-              // Within 2.5 years - valid
               updated.validity = formatDateForDisplay(
                 validityDate.toISOString().split("T")[0],
               );
@@ -629,7 +651,6 @@ export default function ConversionRecencyForm() {
       }),
     );
   };
-
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const scrollToError = () => {
@@ -647,162 +668,6 @@ export default function ConversionRecencyForm() {
       }
     }, 100);
   };
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-
-  //   if (!disclaimerAccepted || !declarationAccepted) {
-  //     setStatus("❌ Please accept both disclaimer and declaration to proceed");
-  //     return;
-  //   }
-
-  //   setLoading(true);
-  //   setStatus("");
-
-  //   // Validate required files
-  //   let requiredFiles = [
-  //     "passportPhoto",
-  //     "foreignLicense",
-  //     "studentSignature",
-  //     "finalSignature",
-  //   ];
-
-  //   if (form.last6MonthsAvailable === "Yes") {
-  //     requiredFiles.push("ca40IR");
-  //     if (form.signalReception === "Yes") {
-  //       requiredFiles.push("signalReceptionTest");
-  //     }
-  //   }
-
-  //   if (form.commercialCheckride === "C172") {
-  //     requiredFiles.push("c172CheckrideStatement");
-  //   } else if (form.c172PICOption === "flightReview") {
-  //     requiredFiles.push("c172FlightReview");
-  //   }
-
-  //   if (form.nameChangeProcessed === "Yes") {
-  //     requiredFiles.push("nameChangeCertificate");
-  //   }
-
-  //   const missingFiles = requiredFiles.filter((field) => !files[field]);
-  //   if (missingFiles.length > 0) {
-  //     setStatus(
-  //       `❌ Please upload all required files: ${missingFiles.join(", ")}`,
-  //     );
-  //     setLoading(false);
-  //     return;
-  //   }
-
-  //   const formData = new FormData();
-
-  //   // Convert all date fields to DD/MM/YYYY format before submitting
-  //   const formWithFormattedDates = { ...form };
-  //   if (form.licenseValidity)
-  //     formWithFormattedDates.licenseValidity = formatDateForDisplay(
-  //       form.licenseValidity,
-  //     );
-  //   if (form.lastFlightDate)
-  //     formWithFormattedDates.lastFlightDate = formatDateForDisplay(
-  //       form.lastFlightDate,
-  //     );
-  //   if (form.irCheckDate)
-  //     formWithFormattedDates.irCheckDate = formatDateForDisplay(
-  //       form.irCheckDate,
-  //     );
-  //   if (form.signalReceptionDate)
-  //     formWithFormattedDates.signalReceptionDate = formatDateForDisplay(
-  //       form.signalReceptionDate,
-  //     );
-  //   if (form.c172CheckrideDate)
-  //     formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(
-  //       form.c172CheckrideDate,
-  //     );
-  //   if (form.medicalValidity)
-  //     formWithFormattedDates.medicalValidity = formatDateForDisplay(
-  //       form.medicalValidity,
-  //     );
-  //   if (form.policeVerificationDate)
-  //     formWithFormattedDates.policeVerificationDate = formatDateForDisplay(
-  //       form.policeVerificationDate,
-  //     );
-
-  //   Object.keys(formWithFormattedDates).forEach((key) => {
-  //     if (key === "dgcaExams") {
-  //       formData.append(key, JSON.stringify(formWithFormattedDates[key]));
-  //     } else {
-  //       formData.append(key, formWithFormattedDates[key]);
-  //     }
-  //   });
-
-  //   // Format sortie rows dates
-  //   const formattedSortieRows = sortieRows.map((row) => ({
-  //     ...row,
-  //     dateFlown: row.dateFlown ? formatDateForDisplay(row.dateFlown) : "",
-  //     ldgTo: row.ldg && row.to ? `${row.ldg}/${row.to}` : "", // Combine LDG/TO
-  //   }));
-  //   formData.append("sortieRows", JSON.stringify(formattedSortieRows));
-
-  //   // Format exam details dates
-  //   const formattedExamDetails = dgcaExamDetails.map((detail) => ({
-  //     ...detail,
-  //     resultDate: detail.resultDate
-  //       ? formatDateForDisplay(detail.resultDate)
-  //       : "",
-  //   }));
-  //   formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
-
-  //   Object.keys(files).forEach((key) => formData.append(key, files[key]));
-
-  //   // Add reCAPTCHA token
-  //   if (recaptchaToken) {
-  //     formData.append("recaptchaToken", recaptchaToken);
-  //   }
-
-  //   try {
-  //     await Promise.all([
-  //       axios.post(`${API_URL}/api/submit-conversion`, formData, {
-  //         headers: { "Content-Type": "multipart/form-data" },
-  //       }),
-  //       delay(5000),
-  //     ]);
-
-  //     // ⚠️ UPDATED: Show popup instead of just status message
-  //     setShowThankYouPopup(true);
-  //     setStatus("");
-
-  //     // Reset form
-  //     setForm(initialState);
-  //     setFiles({});
-  //     setFileErrors({});
-  //     setDisclaimerAccepted(false);
-  //     setDeclarationAccepted(false);
-  //     setRecaptchaToken(null);
-  //     setSortieRows([
-  //       {
-  //         id: Date.now(),
-  //         aircraft: "",
-  //         category: "",
-  //         typeOfFlight: "",
-  //         ldg: "",
-  //         to: "",
-  //         hours: "",
-  //         minutes: "",
-  //         dateFlown: "",
-  //         validity: "",
-  //       },
-  //     ]);
-  //     setDgcaExamDetails([]);
-  //     e.target.reset();
-
-  //     // Scroll to top
-  //     window.scrollTo({ top: 0, behavior: "smooth" });
-  //   } catch (err) {
-  //     setStatus(`❌ ${err.response?.data?.error || "Submission failed"}`);
-  //     scrollToError(); // ⚠️ ADD THIS LINE - Scroll to error
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -836,11 +701,21 @@ export default function ConversionRecencyForm() {
       "marksheet12",
     ];
 
-    if (form.last6MonthsAvailable === "Yes") {
+    // if (form.last6MonthsAvailable === "Yes") {
+    //   requiredFiles.push("ca40IR");
+    //   if (form.signalReception === "Yes") {
+    //     requiredFiles.push("signalReceptionTest");
+    //   }
+    // }
+    if (form.last6MonthsAvailable === "Yes" && form.irCheckGiven === "Yes") {
       requiredFiles.push("ca40IR");
       if (form.signalReception === "Yes") {
         requiredFiles.push("signalReceptionTest");
       }
+    }
+
+    if (form.hasSPL === "Yes") {
+      requiredFiles.push("splDocument");
     }
 
     if (form.commercialCheckride === "C172") {
@@ -872,20 +747,41 @@ export default function ConversionRecencyForm() {
 
       const formWithFormattedDates = { ...form };
       if (form.licenseValidity)
-        formWithFormattedDates.licenseValidity = formatDateForDisplay(form.licenseValidity);
+        formWithFormattedDates.licenseValidity = formatDateForDisplay(
+          form.licenseValidity,
+        );
       if (form.lastFlightDate)
-        formWithFormattedDates.lastFlightDate = formatDateForDisplay(form.lastFlightDate);
+        formWithFormattedDates.lastFlightDate = formatDateForDisplay(
+          form.lastFlightDate,
+        );
       if (form.irCheckDate)
-        formWithFormattedDates.irCheckDate = formatDateForDisplay(form.irCheckDate);
+        formWithFormattedDates.irCheckDate = formatDateForDisplay(
+          form.irCheckDate,
+        );
       if (form.signalReceptionDate)
-        formWithFormattedDates.signalReceptionDate = formatDateForDisplay(form.signalReceptionDate);
+        formWithFormattedDates.signalReceptionDate = formatDateForDisplay(
+          form.signalReceptionDate,
+        );
       if (form.c172CheckrideDate)
-        formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(form.c172CheckrideDate);
+        formWithFormattedDates.c172CheckrideDate = formatDateForDisplay(
+          form.c172CheckrideDate,
+        );
       if (form.medicalValidity)
-        formWithFormattedDates.medicalValidity = formatDateForDisplay(form.medicalValidity);
+        formWithFormattedDates.medicalValidity = formatDateForDisplay(
+          form.medicalValidity,
+        );
       if (form.policeVerificationDate)
-        formWithFormattedDates.policeVerificationDate = formatDateForDisplay(form.policeVerificationDate);
-
+        formWithFormattedDates.policeVerificationDate = formatDateForDisplay(
+          form.policeVerificationDate,
+        );
+      if (form.splIssueDate)
+        formWithFormattedDates.splIssueDate = formatDateForDisplay(
+          form.splIssueDate,
+        );
+      if (form.splValidity)
+        formWithFormattedDates.splValidity = formatDateForDisplay(
+          form.splValidity,
+        );
       Object.keys(formWithFormattedDates).forEach((key) => {
         if (key === "dgcaExams") {
           formData.append(key, JSON.stringify(formWithFormattedDates[key]));
@@ -903,7 +799,9 @@ export default function ConversionRecencyForm() {
 
       const formattedExamDetails = dgcaExamDetails.map((detail) => ({
         ...detail,
-        resultDate: detail.resultDate ? formatDateForDisplay(detail.resultDate) : "",
+        resultDate: detail.resultDate
+          ? formatDateForDisplay(detail.resultDate)
+          : "",
       }));
       formData.append("dgcaExamDetails", JSON.stringify(formattedExamDetails));
 
@@ -922,7 +820,7 @@ export default function ConversionRecencyForm() {
         {
           headers: { "Content-Type": "multipart/form-data" },
           timeout: 120000,
-        }
+        },
       );
 
       if (!response.data.success) {
@@ -931,13 +829,13 @@ export default function ConversionRecencyForm() {
 
       // ✅ STEP 2: Backend accepted! Show progress
       const jobId = response.data.jobId;
-      
+
       setStatus("📄 Generating your documents...");
       await delay(2000);
-      
+
       setStatus("📧 Sending confirmation emails...");
       await delay(2000);
-      
+
       setStatus("📊 Updating records...");
       await delay(2000);
 
@@ -949,28 +847,30 @@ export default function ConversionRecencyForm() {
       while (!jobCompleted && pollAttempts < maxPollAttempts) {
         try {
           const statusResponse = await axios.get(`${API_URL}/api/queue-status`);
-          const currentJob = statusResponse.data.jobs?.find(j => j.id === jobId);
-          
+          const currentJob = statusResponse.data.jobs?.find(
+            (j) => j.id === jobId,
+          );
+
           if (!currentJob) {
             jobCompleted = true;
             break;
           }
-          
+
           if (currentJob.status === "completed") {
             jobCompleted = true;
             break;
           }
-          
+
           if (currentJob.status === "failed") {
             throw new Error("Processing failed after multiple attempts");
           }
-          
+
           if (currentJob.status === "processing") {
             setStatus("⚙️ Processing your application...");
           } else if (currentJob.status === "retrying") {
             setStatus("🔄 Retrying... Please wait...");
           }
-          
+
           await delay(1000);
           pollAttempts++;
         } catch (pollError) {
@@ -1017,7 +917,6 @@ export default function ConversionRecencyForm() {
       }
 
       window.scrollTo({ top: 0, behavior: "smooth" });
-
     } catch (err) {
       console.error("Submission error:", err);
 
@@ -1028,19 +927,19 @@ export default function ConversionRecencyForm() {
       } else if (err.request) {
         errorMessage = "Network error. Please check your internet connection.";
       } else if (err.code === "ECONNABORTED") {
-        errorMessage = "Request timeout. Your data may still be processing. Please contact support if you don't receive confirmation within 1 hour.";
+        errorMessage =
+          "Request timeout. Your data may still be processing. Please contact support if you don't receive confirmation within 1 hour.";
       } else if (err.message) {
         errorMessage = err.message;
       }
 
       setStatus(`❌ ${errorMessage}`);
       scrollToError();
-
     } finally {
       setLoading(false);
     }
   };
-  
+
   const sortieSummary = calculateSortieSummary();
 
   return (
@@ -1251,14 +1150,45 @@ export default function ConversionRecencyForm() {
                   License Validity Date (DD/MM/YYYY)
                   <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  name="licenseValidity"
-                  value={form.licenseValidity}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
-                  required
-                  onChange={handleChange}
-                />
+
+                {form.licenseValidity !== "Lifetime" ? (
+                  <input
+                    type="date"
+                    name="licenseValidity"
+                    value={form.licenseValidity}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200"
+                    required
+                    onChange={handleChange}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value="Lifetime"
+                    disabled
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-600"
+                  />
+                )}
+
+                <div className="flex items-center gap-2 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.licenseValidity === "Lifetime"}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setForm((prev) => ({
+                            ...prev,
+                            licenseValidity: "Lifetime",
+                          }));
+                        } else {
+                          setForm((prev) => ({ ...prev, licenseValidity: "" }));
+                        }
+                      }}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-gray-700 font-medium">Lifetime</span>
+                  </label>
+                </div>
               </div>
 
               <div className="md:col-span-2">
@@ -1266,6 +1196,17 @@ export default function ConversionRecencyForm() {
                   License Endorsement<span className="text-red-500">*</span>
                 </label>
                 <div className="flex space-x-6 mt-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="licenseEndorsement"
+                      value="SE"
+                      className="mr-2 text-blue-500 focus:ring-blue-300"
+                      required
+                      onChange={handleChange}
+                    />
+                    SE
+                  </label>
                   <label className="flex items-center">
                     <input
                       type="radio"
@@ -1569,7 +1510,6 @@ export default function ConversionRecencyForm() {
                                 required
                               >
                                 <option value="">Select</option>
-                                <option value="Dual">Dual</option>
                                 <option value="Day PIC">Day PIC</option>
                                 <option value="Night PIC">Night PIC</option>
                                 <option value="IF">IF</option>
@@ -1697,36 +1637,6 @@ export default function ConversionRecencyForm() {
                   >
                     Add One More Row
                   </button>
-
-                  {/* <div className="mt-6 bg-blue-50 p-4 rounded-lg">
-                    <h5 className="font-bold text-lg mb-2">Summary</h5>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <p className="font-semibold">Total Day PIC:</p>
-                        <p>
-                          {sortieSummary.totalDayPIC.hours} hrs{" "}
-                          {sortieSummary.totalDayPIC.minutes} min
-                        </p>
-                      </div>
-                      <div>
-                        <p className="font-semibold">Total Night PIC:</p>
-                        <p>
-                          {sortieSummary.totalNightPIC.hours} hrs{" "}
-                          {sortieSummary.totalNightPIC.minutes} min
-                        </p>
-                      </div>
-                      <div>
-                        <p className="font-semibold">
-                          Total Instrument Flying:
-                        </p>
-                        <p>
-                          {sortieSummary.totalIF.hours} hrs{" "}
-                          {sortieSummary.totalIF.minutes} min
-                        </p>
-                      </div>
-                    </div>
-                  </div> */}
-
                   <div className="mt-6 bg-blue-50 p-4 rounded-lg">
                     <h5 className="font-bold text-lg mb-2">Summary</h5>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1765,145 +1675,56 @@ export default function ConversionRecencyForm() {
                   </div>
                 </div>
 
-                {/* IR Check */}
+                {/* IR Check Given? */}
                 <div className="mb-8">
                   <h4 className="text-xl font-bold text-gray-800 mb-4">
-                    IR Check
+                    IR Check Given?
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-lg font-bold text-gray-700 mb-2">
-                        Aircraft Flown<span className="text-red-500">*</span>
-                      </label>
+                  <div className="flex space-x-6 mb-6">
+                    <label className="flex items-center">
                       <input
-                        name="irCheckAircraft"
-                        value={form.irCheckAircraft}
-                        placeholder="Enter Aircraft Type"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300"
+                        type="radio"
+                        name="irCheckGiven"
+                        value="Yes"
+                        checked={form.irCheckGiven === "Yes"}
+                        className="mr-2 text-blue-500 focus:ring-blue-300"
                         required
                         onChange={handleChange}
                       />
-                    </div>
-                    <div>
-                      <label className="block text-lg font-bold text-gray-700 mb-2">
-                        Date (DD/MM/YYYY)<span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="irCheckDate"
-                        value={form.irCheckDate}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300"
-                        required
-                        onChange={handleChange}
-                      />
-                    </div>
-                    {/* <div>
-                      <label className="block text-lg font-bold text-gray-700 mb-2">
-                        Validity (DD/MM/YYYY)
-                      </label>
-                      <input
-                        type="text"
-                        value={form.irCheckValidity}
-                        disabled
-                        className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
-                          form.irCheckValidity === "OUT OF RECENCY"
-                            ? "bg-red-100 text-red-700 font-bold"
-                            : "bg-gray-100"
-                        }`}
-                      />
-                    </div> */}
-                    <div>
-                      <label className="block font-semibold mb-2">
-                        Validity (DD/MM/YYYY)
-                      </label>
-                      <input
-                        type="text"
-                        value={form.irCheckValidity}
-                        disabled
-                        className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
-                          form.irCheckValidity === "OUT OF RECENCY"
-                            ? "bg-red-100 text-red-700 font-bold"
-                            : "bg-gray-100"
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-lg font-bold text-gray-700 mb-2">
-                        Upload CA-40 IR Performa
-                        <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="file"
-                        name="ca40IR"
-                        accept="application/pdf"
-                        className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
-                          fileErrors.ca40IR
-                            ? "border-red-400 bg-red-50"
-                            : "border-gray-300"
-                        }`}
-                        required
-                        onChange={handleFile}
-                      />
-                      <p className="text-sm text-gray-600 mt-1">
-                        Only PDF files allowed, less than 2MB
-                      </p>
-                      <a
-                        href="https://skyproaviation.org/wp-content/uploads/2026/01/Example-CA-40.pdf"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 text-sm inline-block"
-                      >
-                        Example CA-40
-                      </a>
-                      {fileErrors.ca40IR && (
-                        <p className="text-red-600 text-sm mt-1">
-                          {fileErrors.ca40IR}
-                        </p>
-                      )}
-                      {files.ca40IR && !fileErrors.ca40IR && (
-                        <p className="text-green-600 text-sm mt-1">
-                          ✓ {files.ca40IR.name}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Signal Reception Test */}
-                <div className="mb-8">
-                  <div className="mb-4">
-                    <label className="block text-lg font-bold text-gray-700 mb-2">
-                      Signal Reception Test Given?
-                      <span className="text-red-500">*</span>
+                      Yes
                     </label>
-                    <div className="flex space-x-6">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="signalReception"
-                          value="Yes"
-                          className="mr-2"
-                          required
-                          onChange={handleChange}
-                        />
-                        Yes
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="signalReception"
-                          value="No"
-                          className="mr-2"
-                          required
-                          onChange={handleChange}
-                        />
-                        No
-                      </label>
-                    </div>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="irCheckGiven"
+                        value="No"
+                        checked={form.irCheckGiven === "No"}
+                        className="mr-2 text-blue-500 focus:ring-blue-300"
+                        required
+                        onChange={handleChange}
+                      />
+                      No
+                    </label>
                   </div>
 
-                  {form.signalReception === "Yes" && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {form.irCheckGiven === "Yes" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Aircraft Flown */}
+                      <div>
+                        <label className="block text-lg font-bold text-gray-700 mb-2">
+                          Aircraft Flown<span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          name="irCheckAircraft"
+                          value={form.irCheckAircraft}
+                          placeholder="Enter Aircraft Type"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300"
+                          required
+                          onChange={handleChange}
+                        />
+                      </div>
+
+                      {/* Date */}
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">
                           Date (DD/MM/YYYY)
@@ -1911,39 +1732,43 @@ export default function ConversionRecencyForm() {
                         </label>
                         <input
                           type="date"
-                          name="signalReceptionDate"
-                          value={form.signalReceptionDate}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl"
+                          name="irCheckDate"
+                          value={form.irCheckDate}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300"
                           required
                           onChange={handleChange}
                         />
                       </div>
+
+                      {/* Validity */}
                       <div>
-                        <label className="block text-lg font-bold text-gray-700 mb-2">
+                        <label className="block font-semibold mb-2">
                           Validity (DD/MM/YYYY)
                         </label>
                         <input
                           type="text"
-                          value={form.signalReceptionValidity}
+                          value={form.irCheckValidity}
                           disabled
                           className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
-                            form.signalReceptionValidity === "OUT OF RECENCY"
+                            form.irCheckValidity === "OUT OF RECENCY"
                               ? "bg-red-100 text-red-700 font-bold"
                               : "bg-gray-100"
                           }`}
                         />
                       </div>
+
+                      {/* Upload CA-40 */}
                       <div>
                         <label className="block text-lg font-bold text-gray-700 mb-2">
-                          Upload Signal Reception Test
+                          Upload CA-40 IR Performa
                           <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="file"
-                          name="signalReceptionTest"
+                          name="ca40IR"
                           accept="application/pdf"
                           className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
-                            fileErrors.signalReceptionTest
+                            fileErrors.ca40IR
                               ? "border-red-400 bg-red-50"
                               : "border-gray-300"
                           }`}
@@ -1953,17 +1778,125 @@ export default function ConversionRecencyForm() {
                         <p className="text-sm text-gray-600 mt-1">
                           Only PDF files allowed, less than 2MB
                         </p>
-                        {fileErrors.signalReceptionTest && (
+                        <a
+                          href="https://skyproaviation.org/wp-content/uploads/2026/01/Example-CA-40.pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 text-sm inline-block"
+                        >
+                          Example CA-40
+                        </a>
+                        {fileErrors.ca40IR && (
                           <p className="text-red-600 text-sm mt-1">
-                            {fileErrors.signalReceptionTest}
+                            {fileErrors.ca40IR}
                           </p>
                         )}
-                        {files.signalReceptionTest &&
-                          !fileErrors.signalReceptionTest && (
-                            <p className="text-green-600 text-sm mt-1">
-                              ✓ {files.signalReceptionTest.name}
-                            </p>
-                          )}
+                        {files.ca40IR && !fileErrors.ca40IR && (
+                          <p className="text-green-600 text-sm mt-1">
+                            ✓ {files.ca40IR.name}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Signal Reception — nested inside IR Check Yes */}
+                      <div className="md:col-span-2 mt-2">
+                        <label className="block text-lg font-bold text-gray-700 mb-2">
+                          Signal Reception Test Given?
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex space-x-6 mb-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="signalReception"
+                              value="Yes"
+                              checked={form.signalReception === "Yes"}
+                              className="mr-2"
+                              required
+                              onChange={handleChange}
+                            />
+                            Yes
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="signalReception"
+                              value="No"
+                              checked={form.signalReception === "No"}
+                              className="mr-2"
+                              required
+                              onChange={handleChange}
+                            />
+                            No
+                          </label>
+                        </div>
+
+                        {form.signalReception === "Yes" && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                              <label className="block text-lg font-bold text-gray-700 mb-2">
+                                Date (DD/MM/YYYY)
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="date"
+                                name="signalReceptionDate"
+                                value={form.signalReceptionDate}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl"
+                                required
+                                onChange={handleChange}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-lg font-bold text-gray-700 mb-2">
+                                Validity (DD/MM/YYYY)
+                              </label>
+                              <input
+                                type="text"
+                                value={form.signalReceptionValidity}
+                                disabled
+                                className={`w-full px-4 py-3 border border-gray-300 rounded-xl ${
+                                  form.signalReceptionValidity ===
+                                  "OUT OF RECENCY"
+                                    ? "bg-red-100 text-red-700 font-bold"
+                                    : "bg-gray-100"
+                                }`}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-lg font-bold text-gray-700 mb-2">
+                                Upload Signal Reception Test
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="file"
+                                name="signalReceptionTest"
+                                accept="application/pdf"
+                                className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
+                                  fileErrors.signalReceptionTest
+                                    ? "border-red-400 bg-red-50"
+                                    : "border-gray-300"
+                                }`}
+                                required
+                                onChange={handleFile}
+                              />
+                              <p className="text-sm text-gray-600 mt-1">
+                                Only PDF files allowed, less than 2MB
+                              </p>
+                              {fileErrors.signalReceptionTest && (
+                                <p className="text-red-600 text-sm mt-1">
+                                  {fileErrors.signalReceptionTest}
+                                </p>
+                              )}
+                              {files.signalReceptionTest &&
+                                !fileErrors.signalReceptionTest && (
+                                  <p className="text-green-600 text-sm mt-1">
+                                    ✓ {files.signalReceptionTest.name}
+                                  </p>
+                                )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2154,22 +2087,40 @@ export default function ConversionRecencyForm() {
             >
               6. PIC Experience
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 gap-6">
+              {/* Total PIC Experience — HH:MM */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Total PIC Experience<span className="text-red-500">*</span>
+                  Total PIC Experience (HH:MM)
+                  <span className="text-red-500">*</span>
                 </label>
-                <input
-                  name="totalPICExperience"
-                  value={form.totalPICExperience}
-                  type="number"
-                  placeholder="Enter hours"
-                  inputMode="numeric"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl"
-                  required
-                  onChange={handleChange}
-                />
+                <div className="flex gap-2 items-center">
+                  <input
+                    name="totalPICExperienceHours"
+                    type="number"
+                    min="0"
+                    placeholder="HH"
+                    value={form.totalPICExperienceHours}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                  <span className="text-xl font-bold">:</span>
+                  <input
+                    name="totalPICExperienceMinutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    placeholder="MM"
+                    value={form.totalPICExperienceMinutes}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
+
+              {/* Upload 100 hrs PIC Statement */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
                   Upload 100 hrs PIC Statement
@@ -2179,11 +2130,7 @@ export default function ConversionRecencyForm() {
                   type="file"
                   name="pic100Statement"
                   accept="application/pdf"
-                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
-                    fileErrors.pic100Statement
-                      ? "border-red-400 bg-red-50"
-                      : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${fileErrors.pic100Statement ? "border-red-400 bg-red-50" : "border-gray-300"}`}
                   required
                   onChange={handleFile}
                 />
@@ -2201,6 +2148,8 @@ export default function ConversionRecencyForm() {
                   </p>
                 )}
               </div>
+
+              {/* Upload 300 nm Cross Country Statement */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
                   Upload 300 nm Cross Country Statement
@@ -2210,11 +2159,7 @@ export default function ConversionRecencyForm() {
                   type="file"
                   name="crossCountry300Statement"
                   accept="application/pdf"
-                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
-                    fileErrors.crossCountry300Statement
-                      ? "border-red-400 bg-red-50"
-                      : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${fileErrors.crossCountry300Statement ? "border-red-400 bg-red-50" : "border-gray-300"}`}
                   required
                   onChange={handleFile}
                 />
@@ -2233,21 +2178,40 @@ export default function ConversionRecencyForm() {
                     </p>
                   )}
               </div>
+
+              {/* Total PIC Cross-country — HH:MM */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
-                  Total PIC Cross-country Experience
+                  Total PIC Cross-country Experience (HH:MM)
                   <span className="text-red-500">*</span>
                 </label>
-                <input
-                  name="totalPICCrossCountry"
-                  value={form.totalPICCrossCountry}
-                  type="number"
-                  placeholder="Enter hours"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl"
-                  required
-                  onChange={handleChange}
-                />
+                <div className="flex gap-2 items-center">
+                  <input
+                    name="totalPICCrossCountryHours"
+                    type="number"
+                    min="0"
+                    placeholder="HH"
+                    value={form.totalPICCrossCountryHours}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                  <span className="text-xl font-bold">:</span>
+                  <input
+                    name="totalPICCrossCountryMinutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    placeholder="MM"
+                    value={form.totalPICCrossCountryMinutes}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
+
+              {/* Upload Total PIC Cross-country Statement */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
                   Upload Total PIC Cross-country Statement
@@ -2257,11 +2221,7 @@ export default function ConversionRecencyForm() {
                   type="file"
                   name="picCrossCountryStatement"
                   accept="application/pdf"
-                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
-                    fileErrors.picCrossCountryStatement
-                      ? "border-red-400 bg-red-50"
-                      : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${fileErrors.picCrossCountryStatement ? "border-red-400 bg-red-50" : "border-gray-300"}`}
                   required
                   onChange={handleFile}
                 />
@@ -2280,20 +2240,81 @@ export default function ConversionRecencyForm() {
                     </p>
                   )}
               </div>
+
+              {/* Total Instrument Time — 3 rows */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
                   Total Instrument Time<span className="text-red-500">*</span>
                 </label>
+
+                <p className="text-sm font-semibold text-gray-600 mb-1">
+                  On Actual Aircraft (HH:MM)
+                </p>
+                <div className="flex gap-2 items-center mb-4">
+                  <input
+                    name="instrumentActualHours"
+                    type="number"
+                    min="0"
+                    placeholder="HH"
+                    value={form.instrumentActualHours}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                  <span className="text-xl font-bold">:</span>
+                  <input
+                    name="instrumentActualMinutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    placeholder="MM"
+                    value={form.instrumentActualMinutes}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <p className="text-sm font-semibold text-gray-600 mb-1">
+                  On Simulator (HH:MM)
+                </p>
+                <div className="flex gap-2 items-center mb-4">
+                  <input
+                    name="instrumentSimulatorHours"
+                    type="number"
+                    min="0"
+                    placeholder="HH"
+                    value={form.instrumentSimulatorHours}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                  <span className="text-xl font-bold">:</span>
+                  <input
+                    name="instrumentSimulatorMinutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    placeholder="MM"
+                    value={form.instrumentSimulatorMinutes}
+                    className="w-1/2 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <p className="text-sm font-semibold text-gray-600 mb-1">
+                  Total (HH:MM — auto calculated)
+                </p>
                 <input
-                  name="totalInstrumentTime"
+                  type="text"
                   value={form.totalInstrumentTime}
-                  type="number"
-                  placeholder="Enter hours"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl"
-                  required
-                  onChange={handleChange}
+                  disabled
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-700"
                 />
               </div>
+
+              {/* Upload Total Instrument Time Statement */}
               <div>
                 <label className="block text-lg font-bold text-gray-700 mb-2">
                   Upload Total Instrument Time Statement
@@ -2303,11 +2324,7 @@ export default function ConversionRecencyForm() {
                   type="file"
                   name="instrumentTimeStatement"
                   accept="application/pdf"
-                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
-                    fileErrors.instrumentTimeStatement
-                      ? "border-red-400 bg-red-50"
-                      : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${fileErrors.instrumentTimeStatement ? "border-red-400 bg-red-50" : "border-gray-300"}`}
                   required
                   onChange={handleFile}
                 />
@@ -2429,6 +2446,28 @@ export default function ConversionRecencyForm() {
                     <h6 className="font-bold mb-3">
                       {formatExamName(detail.exam)}
                     </h6>
+                    {/* Aircraft field — sirf Technical Specific ke liye */}
+                    {detail.exam === "technicalSpecific" && (
+                      <div className="mb-4">
+                        <label className="block font-semibold mb-2">
+                          Aircraft<span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={detail.aircraft || ""}
+                          onChange={(e) =>
+                            handleExamDetailChange(
+                              detail.exam,
+                              "aircraft",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="e.g., C172, PA28"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-300"
+                          required
+                        />
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block font-semibold mb-2">
@@ -2746,7 +2785,104 @@ export default function ConversionRecencyForm() {
               </div>
             </div>
             {/* GRID END */}
+            {/* SPL */}
+            <div className="mt-6">
+              <label className="block text-lg font-bold text-gray-700 mb-2">
+                Do You Have a Student Pilot License (SPL)?
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="flex space-x-6">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasSPL"
+                    value="Yes"
+                    checked={form.hasSPL === "Yes"}
+                    className="mr-2"
+                    required
+                    onChange={handleChange}
+                  />
+                  Yes
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasSPL"
+                    value="No"
+                    checked={form.hasSPL === "No"}
+                    className="mr-2"
+                    required
+                    onChange={handleChange}
+                  />
+                  No
+                </label>
+              </div>
 
+              {form.hasSPL === "Yes" && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                  <div>
+                    <label className="block text-lg font-bold text-gray-700 mb-2">
+                      Issue Date (DD/MM/YYYY)
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="splIssueDate"
+                      value={form.splIssueDate}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300"
+                      required
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-lg font-bold text-gray-700 mb-2">
+                      Validity (DD/MM/YYYY)
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="splValidity"
+                      value={form.splValidity}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300"
+                      required
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-lg font-bold text-gray-700 mb-2">
+                      Upload SPL<span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="file"
+                      name="splDocument"
+                      accept="application/pdf"
+                      className={`w-full px-4 py-3 border-2 border-dashed rounded-xl focus:ring-2 focus:ring-blue-300 transition-all duration-200 ${
+                        fileErrors.splDocument
+                          ? "border-red-400 bg-red-50"
+                          : "border-gray-300"
+                      }`}
+                      required
+                      onChange={handleFile}
+                    />
+                    <p className="text-sm text-gray-600 mt-1">
+                      Only PDF files allowed, less than 2MB
+                    </p>
+                    {fileErrors.splDocument && (
+                      <p className="text-red-600 text-sm mt-1">
+                        {fileErrors.splDocument}
+                      </p>
+                    )}
+                    {files.splDocument && !fileErrors.splDocument && (
+                      <p className="text-green-600 text-sm mt-1">
+                        ✓ {files.splDocument.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Name Change Section */}
             <div className="mt-6">
               <label className="block text-lg font-bold text-gray-700 mb-2">
@@ -3052,9 +3188,9 @@ export default function ConversionRecencyForm() {
           </button>
         </form>
       </div>
-      <ThankYouPopup 
-        isOpen={showThankYouPopup} 
-        onClose={() => setShowThankYouPopup(false)} 
+      <ThankYouPopup
+        isOpen={showThankYouPopup}
+        onClose={() => setShowThankYouPopup(false)}
       />
     </div>
   );
