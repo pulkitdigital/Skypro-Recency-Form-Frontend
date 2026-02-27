@@ -584,36 +584,67 @@ export default function ConversionRecencyForm() {
     );
   };
 
+  // const calculateSortieSummary = () => {
+  //   let totalDayPIC = 0;
+  //   let totalNightPIC = 0;
+  //   let totalIF = 0;
+  //   let totalNightPICLDG = 0;
+  //   let totalNightPICTO = 0;
+
+  //   sortieRows.forEach((row) => {
+  //     const hours = parseInt(row.hours) || 0;
+  //     const minutes = parseInt(row.minutes) || 0;
+  //     const totalTime = timeToDecimal(hours, minutes);
+
+  //     if (row.typeOfFlight === "Day PIC") totalDayPIC += totalTime;
+  //     if (row.typeOfFlight === "Night PIC") {
+  //       totalNightPIC += totalTime;
+  //       totalNightPICLDG += parseInt(row.ldg) || 0;
+  //       totalNightPICTO += parseInt(row.to) || 0;
+  //     }
+  //     if (row.typeOfFlight === "IF") totalIF += totalTime;
+  //   });
+
+  //   return {
+  //     totalDayPIC: decimalToTime(totalDayPIC),
+  //     totalNightPIC: decimalToTime(totalNightPIC),
+  //     totalIF: decimalToTime(totalIF),
+  //     totalNightPICLDG,
+  //     totalNightPICTO,
+  //   };
+  // };
+
   const calculateSortieSummary = () => {
-    let totalDayPIC = 0;
-    let totalNightPIC = 0;
-    let totalIF = 0;
-    let totalNightPICLDG = 0;
-    let totalNightPICTO = 0;
+  let totalDayPIC = 0;
+  let totalNightPIC = 0;
+  let totalIF = 0;
+  let totalNightPICLDG = 0;
+  let totalNightPICTO = 0;
 
-    sortieRows.forEach((row) => {
-      const hours = parseInt(row.hours) || 0;
-      const minutes = parseInt(row.minutes) || 0;
-      const totalTime = timeToDecimal(hours, minutes);
+  sortieRows.forEach((row) => {
+    if (row.validity === "OUT OF RECENCY") return; // ← skip out of recency rows
 
-      if (row.typeOfFlight === "Day PIC") totalDayPIC += totalTime;
-      if (row.typeOfFlight === "Night PIC") {
-        totalNightPIC += totalTime;
-        totalNightPICLDG += parseInt(row.ldg) || 0;
-        totalNightPICTO += parseInt(row.to) || 0;
-      }
-      if (row.typeOfFlight === "IF") totalIF += totalTime;
-    });
+    const hours = parseInt(row.hours) || 0;
+    const minutes = parseInt(row.minutes) || 0;
+    const totalTime = timeToDecimal(hours, minutes);
 
-    return {
-      totalDayPIC: decimalToTime(totalDayPIC),
-      totalNightPIC: decimalToTime(totalNightPIC),
-      totalIF: decimalToTime(totalIF),
-      totalNightPICLDG,
-      totalNightPICTO,
-    };
+    if (row.typeOfFlight === "Day PIC") totalDayPIC += totalTime;
+    if (row.typeOfFlight === "Night PIC") {
+      totalNightPIC += totalTime;
+      totalNightPICLDG += parseInt(row.ldg) || 0;
+      totalNightPICTO += parseInt(row.to) || 0;
+    }
+    if (row.typeOfFlight === "IF") totalIF += totalTime;
+  });
+
+  return {
+    totalDayPIC: decimalToTime(totalDayPIC),
+    totalNightPIC: decimalToTime(totalNightPIC),
+    totalIF: decimalToTime(totalIF),
+    totalNightPICLDG,
+    totalNightPICTO,
   };
-
+};
   const handleExamDetailChange = (exam, field, value) => {
     setDgcaExamDetails((prev) =>
       prev.map((detail) => {
@@ -720,7 +751,7 @@ export default function ConversionRecencyForm() {
 
     if (form.commercialCheckride === "C172") {
       requiredFiles.push("c172CheckrideStatement");
-    } else if (form.c172PICOption === "flightReview") {
+    } else if (form.c172PICOption === "Flight Review / Check Ride on C172 in last 24 months") {
       requiredFiles.push("c172FlightReview");
     }
 
@@ -746,10 +777,12 @@ export default function ConversionRecencyForm() {
       const formData = new FormData();
 
       const formWithFormattedDates = { ...form };
-      if (form.licenseValidity)
-        formWithFormattedDates.licenseValidity = formatDateForDisplay(
-          form.licenseValidity,
-        );
+      // if (form.licenseValidity)
+      //   formWithFormattedDates.licenseValidity = formatDateForDisplay(
+      //     form.licenseValidity,
+      //   );
+      if (form.licenseValidity && form.licenseValidity !== "Lifetime")
+        formWithFormattedDates.licenseValidity = formatDateForDisplay(form.licenseValidity);
       if (form.lastFlightDate)
         formWithFormattedDates.lastFlightDate = formatDateForDisplay(
           form.lastFlightDate,
@@ -1674,11 +1707,10 @@ export default function ConversionRecencyForm() {
                     </div>
                   </div>
                 </div>
-
                 {/* IR Check Given? */}
                 <div className="mb-8">
                   <h4 className="text-xl font-bold text-gray-800 mb-4">
-                    IR Check Given?
+                    IR Check Given? <span className="text-red-500">*</span>
                   </h4>
                   <div className="flex space-x-6 mb-6">
                     <label className="flex items-center">
@@ -2004,7 +2036,7 @@ export default function ConversionRecencyForm() {
                     <input
                       type="radio"
                       name="c172PICOption"
-                      value="10hrs"
+                      value="10 hrs PIC on C172 in the last 24 Months"
                       className="mr-3 mt-1"
                       required
                       onChange={handleChange}
@@ -2015,7 +2047,7 @@ export default function ConversionRecencyForm() {
                     <input
                       type="radio"
                       name="c172PICOption"
-                      value="flightReview"
+                      value="Flight Review / Check Ride on C172 in last 24 months"
                       className="mr-3 mt-1"
                       required
                       onChange={handleChange}
@@ -2029,7 +2061,7 @@ export default function ConversionRecencyForm() {
                     <input
                       type="radio"
                       name="c172PICOption"
-                      value="neither"
+                      value="Neither 10 hrs PIC nor Flight Review on C172"
                       className="mr-3 mt-1"
                       required
                       onChange={handleChange}
@@ -2042,7 +2074,7 @@ export default function ConversionRecencyForm() {
                   </label>
                 </div>
 
-                {form.c172PICOption === "flightReview" && (
+                {form.c172PICOption === "Flight Review / Check Ride on C172 in last 24 months" && (
                   <div className="mt-4">
                     <label className="block text-lg font-bold text-gray-700 mb-2">
                       Upload Flight review/Check ride/Flight Test/Skill Tests on
@@ -2304,7 +2336,7 @@ export default function ConversionRecencyForm() {
                 </div>
 
                 <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Total (HH:MM — auto calculated)
+                  Total (HH:MM)
                 </p>
                 <input
                   type="text"
