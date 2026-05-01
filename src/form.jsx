@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import ReCAPTCHA from "react-google-recaptcha";
+// import ReCAPTCHA from "react-google-recaptcha";
 import FormHeader from "./FormHeader";
 import ThankYouPopup from "./ThankYouPopup";
 
@@ -89,7 +89,7 @@ export default function ConversionRecencyForm() {
     },
   ]);
   const [dgcaExamDetails, setDgcaExamDetails] = useState([]);
-  const [recaptchaToken, setRecaptchaToken] = useState(null);
+  // const [recaptchaToken, setRecaptchaToken] = useState(null);
   const [showThankYouPopup, setShowThankYouPopup] = useState(false);
   const formRef = useRef(null);
 
@@ -140,7 +140,7 @@ export default function ConversionRecencyForm() {
   };
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-  const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+  // const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
   // Helper function to convert DD/MM/YYYY to YYYY-MM-DD for date input
   const formatDateForInput = (ddmmyyyy) => {
@@ -709,11 +709,12 @@ export default function ConversionRecencyForm() {
       return;
     }
 
-    if (!recaptchaToken) {
-      setStatus("❌ Please complete reCAPTCHA");
-      scrollToError();
-      return;
-    }
+    // reCAPTCHA disabled for local/dev
+    // if (!recaptchaToken) {
+    //   setStatus("❌ Please complete reCAPTCHA");
+    //   scrollToError();
+    //   return;
+    // }
 
     let requiredFiles = [
       "passportPhoto",
@@ -840,9 +841,10 @@ export default function ConversionRecencyForm() {
 
       Object.keys(files).forEach((key) => formData.append(key, files[key]));
 
-      if (recaptchaToken) {
-        formData.append("recaptchaToken", recaptchaToken);
-      }
+      // reCAPTCHA disabled for local/dev
+      // if (recaptchaToken) {
+      //   formData.append("recaptchaToken", recaptchaToken);
+      // }
 
       // ✅ STEP 1: Submit and wait for backend validation
       setStatus("⏳ Submitting to server...");
@@ -926,7 +928,7 @@ export default function ConversionRecencyForm() {
       setFileErrors({});
       setDisclaimerAccepted(false);
       setDeclarationAccepted(false);
-      setRecaptchaToken(null);
+      // setRecaptchaToken(null);
       setSortieRows([
         {
           id: Date.now(),
@@ -3195,7 +3197,8 @@ export default function ConversionRecencyForm() {
             </div>
           </section>
 
-          {/* reCAPTCHA */}
+          {/* reCAPTCHA (disabled) */}
+          {/*
           <section className="mb-8">
             <div className="flex justify-center">
               <ReCAPTCHA
@@ -3204,6 +3207,7 @@ export default function ConversionRecencyForm() {
               />
             </div>
           </section>
+          */}
 
           {/* Submit Button */}
           <button
@@ -3211,8 +3215,8 @@ export default function ConversionRecencyForm() {
             disabled={
               loading ||
               !disclaimerAccepted ||
-              !declarationAccepted ||
-              !recaptchaToken
+              !declarationAccepted
+              // || !recaptchaToken
             }
             className="w-full bg-[#003366] hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-2xl text-xl shadow-xl hover:shadow-2xl transition-all duration-300 focus:ring-4 focus:ring-blue-500"
           >
